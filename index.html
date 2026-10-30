@@ -134,6 +134,18 @@ ol.steps li{margin:3px 0}
     <div id="advEthereum"></div>
   </div>
 
+  <div class="card" id="goldCard">
+    <div class="adv-head"><div><h2 style="margin-bottom:4px">Gold paper test <span class="tag">paper only</span></h2>
+      <p class="small muted">Kalshi's 15-minute gold markets. Rule: with 7:00 left, buy the favorite if it costs 90-97¢ and its price rose over the last 2 minutes. Recorded for everyone, no money spent. Researched on 3 months of gold data: about 96% wins, +2.6¢ per contract.</p></div></div>
+    <div id="goldLive"></div>
+    <div class="grid" style="margin-top:12px">
+      <section class="card" style="margin:0"><h2>Record so far</h2><div id="goldStats" class="small">--</div></section>
+      <section class="card" style="margin:0"><h2>What it would have made</h2><div id="goldMoney" class="small">--</div></section>
+    </div>
+    <h2 style="margin-top:16px">Gold paper trades</h2>
+    <div class="scroll" style="max-height:320px"><table id="goldTrades"></table></div>
+  </div>
+
   <div class="card" style="margin-top:16px">
     <h2>Your results</h2>
     <div class="scroll"><table id="results"></table></div>
@@ -273,7 +285,7 @@ async function load(force) {
     sb.from("signals").select("*").order("decided_at", { ascending: false }).limit(1000),
     sb.from("trades").select("*").order("created_at", { ascending: false }).limit(500),
     sb.from("events").select("ts,msg,user_id").order("ts", { ascending: false }).limit(40),
-    sb.from("strat_signals").select("strategy,coin,side,price,result").eq("passed", true).order("decided_at", { ascending: false }).limit(5000),
+    sb.from("strat_signals").select("strategy,coin,ticker,decided_at,side,price,result").eq("passed", true).order("decided_at", { ascending: false }).limit(5000),
     sb.from("coin_state").select("coin,sigma,updated_at"),
   ]);
   A = a.data; SIG = s.data || []; TR = t.data || []; EV = e.data || []; ST = st.data || [];
@@ -356,7 +368,7 @@ function render() {
   // key
   $("keyOn").classList.toggle("hidden", !A.key_ok); $("keyForm").classList.toggle("hidden", !!A.key_ok);
   $("keyIdShow").textContent = A.kalshi_key_id ? A.kalshi_key_id.slice(0, 8) + "..." : "";
-  renderAdvisor(); renderResults(); renderCompare(); renderTrades();
+  renderAdvisor(); renderGold(); renderResults(); renderCompare(); renderTrades();
   $("log").textContent = EV.length ? EV.map((e) => `${tm(e.ts)}  ${e.user_id ? "" : "[market] "}${e.msg}`).join("\n") : "Nothing yet.";
 }
 // ---------- advisor ----------
@@ -449,6 +461,51 @@ function renderAdvisor() {
     }
   }
 }
+// ---------- gold paper test ----------
+function goldLiveHtml() {
+  const qs = Q.filter((q) => q.coin === "Gold"); const last = qs[qs.length - 1];
+  const age = last ? (Date.now() - Date.parse(last.ts)) / 1000 : 1e9;
+  if (!last || age > 60) return '<p class="muted" style="margin:0">Gold markets are closed right now. They run Sunday 6 PM to Friday 5 PM Eastern, with a short daily break around 5 PM Eastern.</p>';
+  const left = last.left_s - age, ya = +last.ya, yb = +last.yb, mid = (ya + yb) / 2;
+  const side = mid >= 0.5 ? "yes" : "no", price = side === "yes" ? ya : 1 - yb, fav = side === "yes" ? mid : 1 - mid;
+  const mq = qs.filter((q) => q.ticker === last.ticker && +q.ya > 0 && +q.yb > 0);
+  const o = mq.filter((q) => Date.parse(q.ts) <= Date.parse(last.ts) - 120000).pop();
+  let trend = null; if (o) { const om = (+o.ya + +o.yb) / 2; trend = (fav - (side === "yes" ? om : 1 - om)) * 100; }
+  const checks = [
+    { ok: price >= 0.90 && price <= 0.97, t: `Favorite costs 90-97¢ (now ${(price * 100).toFixed(0)}¢)` },
+    { ok: trend != null && trend > 0, t: trend == null ? "Favorite rising over the last 2 min (collecting)" : `Favorite rising over the last 2 min (${trend >= 0 ? "+" : ""}${trend.toFixed(1)}¢)` },
+  ];
+  const dec = ST.find((x) => x.strategy === "gold_fav7" && x.ticker === last.ticker);
+  let kind, title, detail;
+  if (dec) { kind = "take"; title = `Paper buy: ${dec.side === "yes" ? "UP" : "DOWN"} at ${(dec.price * 100).toFixed(0)}¢`; detail = "Result comes in when this market closes."; }
+  else if (left > 420) { kind = "ready"; title = `Checks at 7:00 left (in ${fmtLeft(left - 420)})`; detail = checks.every((c) => c.ok) ? "Both checks are green right now." : "Watching the price."; }
+  else if (left >= 380) { kind = checks.every((c) => c.ok) ? "take" : "skip"; title = checks.every((c) => c.ok) ? `Buying ${side === "yes" ? "UP" : "DOWN"} now (paper)` : "Skipping this market"; detail = ""; }
+  else { kind = "closed"; title = "No trade this market"; detail = `Next gold market starts in ${fmtLeft(left)}.`; }
+  return `<div class="coinhead"><h3>Gold now</h3><span class="small muted num">${fmtLeft(left)} left</span></div>
+    <div class="verdict ${kind}${side === "no" ? " under" : ""}" style="font-size:24px">${esc(title)}</div>${detail ? `<p class="detail">${esc(detail)}</p>` : ""}
+    <div class="row"><span>Leaning</span><span><b class="${side === "yes" ? "pos" : "neg"}">${side === "yes" ? "Up" : "Down"}</b> ${Math.round(fav * 100)}% (Up ${(ya * 100).toFixed(0)}¢, Down ${((1 - yb) * 100).toFixed(0)}¢)</span></div>
+    <ul class="checks">${checks.map((c) => `<li><span class="dot ${c.ok ? "ok" : "no"}"></span><span>${c.t}</span></li>`).join("")}</ul>`;
+}
+function renderGoldLive() { $("goldLive").innerHTML = goldLiveHtml(); }
+function renderGold() {
+  renderGoldLive();
+  const G = ST.filter((x) => x.strategy === "gold_fav7").sort((a, b) => Date.parse(a.decided_at) - Date.parse(b.decided_at));
+  const done = G.filter((x) => x.result); const w = done.filter((x) => x.result === x.side).length;
+  const pc = (x) => ((x.result === x.side ? 1 - x.price : -x.price) - fee(+x.price)) * 100;
+  const tot = done.reduce((a, x) => a + pc(x), 0);
+  $("goldStats").innerHTML = G.length ? `<div class="big">${done.length ? `${w} of ${done.length} won` : "Waiting"}</div>
+    <div class="row"><span>Paper trades</span><span>${G.length}${G.length > done.length ? ` (${G.length - done.length} open)` : ""}</span></div>
+    <div class="row"><span>Win rate</span><span>${done.length ? (w / done.length * 100).toFixed(1) + "% (target ~96%)" : "--"}</span></div>
+    <div class="row"><span>Average per contract</span><span class="${cls(tot)}">${done.length ? cents(tot / done.length) : "--"} (target +1 to +3¢)</span></div>
+    <div class="row"><span>Total per contract</span><span class="${cls(tot)}">${done.length ? cents(tot) : "--"}</span></div>
+    ${done.length < 150 ? `<p class="small muted" style="margin:8px 0 0">Too early to judge: about 150-200 trades (2-3 weeks) are needed. One loss costs about 15 wins.</p>` : ""}` : '<p class="muted" style="margin:0">No gold paper trades yet. The first ones come in at the next 7:00-left check while gold is open.</p>';
+  let bal = 26, peak = 26, dd = 0;
+  for (const x of done) { const p = +x.price; bal += bal * 0.025 / (p + fee(p)) * (pc(x) / 100); peak = Math.max(peak, bal); dd = Math.max(dd, 1 - bal / peak); }
+  $("goldMoney").innerHTML = done.length ? `<div class="big ${cls(bal - 26)}">${usd(bal)}</div><div class="row"><span>Started with</span><span>$26.00, betting 2.5% per trade</span></div><div class="row"><span>Change</span><span class="${cls(bal - 26)}">${sgnUsd(bal - 26)}</span></div><div class="row"><span>Worst drop along the way</span><span>${(dd * 100).toFixed(0)}%</span></div>` : '<p class="muted" style="margin:0">Shows how $26 betting 2.5% per gold trade would have done, once trades settle.</p>';
+  const rows = G.slice().reverse().slice(0, 60);
+  $("goldTrades").innerHTML = rows.length ? '<tr><th class="l">Time</th><th>Bought</th><th>Price</th><th>Result</th><th>Profit</th></tr>' + rows.map((x) => `<tr><td class="l">${tm(x.decided_at)}</td><td>${x.side === "yes" ? "Up" : "Down"}</td><td class="num">${(x.price * 100).toFixed(1)}¢</td><td>${x.result ? (x.result === x.side ? '<span class="pos">Won</span>' : '<span class="neg">Lost</span>') : '<span class="muted">waiting</span>'}</td><td class="num ${x.result ? cls(pc(x)) : ""}">${x.result ? cents(pc(x)) : "--"}</td></tr>`).join("") : '<tr><td class="l muted">None yet.</td></tr>';
+}
+
 // ---------- strategy comparison ----------
 const STRAT_INFO = [
   ["main", "Optimized: rising favorite, 1:00 left", "82% won, +4.6¢ (BTC) · 80%, +2.7¢ (ETH)"],
@@ -498,7 +555,7 @@ setInterval(() => {
   const n = nextDecision(), s = Math.max(0, Math.round((n - Date.now()) / 1000));
   $("sNext").textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
   $("sNextNote").textContent = `At ${n.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}, with 1:00 left in the current markets`;
-  if (A && session) renderAdvisor();
+  if (A && session) { renderAdvisor(); renderGoldLive(); }
 }, 1000);
 sb.auth.getSession().then(({ data }) => { if (!data.session) { $("authView").classList.remove("hidden"); } });
 </script>
