@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Privacy - Kalshi 15-Minute Bot</title><link rel="icon" href="favicon.svg" type="image/svg+xml">
+<style>:root{--bg:#f5f6f4;--ink:#16191d;--muted:#5f6670;--accent:#1f5fbf}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1214;--ink:#e8eaed;--muted:#9aa3ad;--accent:#5b95e8}}
+:root[data-theme="dark"]{--bg:#0f1214;--ink:#e8eaed;--muted:#9aa3ad;--accent:#5b95e8}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:720px;margin:0 auto;padding:24px 16px 48px}a{color:var(--accent)}h1{font-size:24px}h2{font-size:17px;margin-top:24px}.muted{color:var(--muted);font-size:13px}</style></head>
+<body><main><p><a href="index.html">Back to the bot</a></p><h1>Privacy</h1><p class="muted">Draft, last updated October 29, 2026.</p>
+<p>This page explains what this site stores and why. It is a small private tool run for invited people, not a company.</p>
+<h2>What is stored</h2>
+<ul><li>Your email address and a password (the password is stored hashed by Supabase, the hosting service).</li>
+<li>Your Kalshi API Key ID and private key, if you connect them. The private key is encrypted at rest in Supabase Vault and is only used by the server to check your balance and place the orders this bot makes. It is never shown on the site again.</li>
+<li>Your settings, the trades the bot records for you, your Kalshi balance as last checked, and an activity log.</li>
+<li>Public Kalshi market prices used by the strategy.</li></ul>
+<h2>Who can see it</h2>
+<p>You can see only your own account, trades and log. The person who runs the site can technically access the database, including your encrypted key. Do not connect a key unless you trust them.</p>
+<h2>Where it is kept</h2>
+<p>On Supabase servers in the US (us-west-1). The site itself is hosted on GitHub Pages. Neither service receives your private key from the site except Supabase.</p>
+<h2>Deleting your data</h2>
+<p>Use "Remove key" to delete your private key at any time. You can also delete the key on kalshi.com, which makes the stored copy useless. Ask the person who invited you to delete your account and all your data.</p>
+<h2>Cookies</h2>
+<p>The site keeps your sign-in in your browser's local storage. It uses no tracking or advertising cookies.</p>
+</main></body></html>

@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kalshi 15-Minute Bot</title>
+<meta name="description" content="Runs the rising-favorite strategy on Kalshi's 15-minute Bitcoin and Ethereum markets for your own Kalshi account.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f5f6f4;--surface:#ffffff;--line:#e2e4df;--ink:#16191d;--muted:#5f6670;--up:#0f8a5f;--down:#c23b3b;--amber:#a86a00;--accent:#1f5fbf;--accent-ink:#fff;--soft:#eef1ec;
+ --sans:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"JetBrains Mono",ui-monospace,Consolas,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1214;--surface:#171b1f;--line:#2a3036;--ink:#e8eaed;--muted:#9aa3ad;--up:#34c08b;--down:#ef6b6b;--amber:#e0a63a;--accent:#5b95e8;--accent-ink:#0b0e11;--soft:#1d2227}}
+:root[data-theme="dark"]{--bg:#0f1214;--surface:#171b1f;--line:#2a3036;--ink:#e8eaed;--muted:#9aa3ad;--up:#34c08b;--down:#ef6b6b;--amber:#e0a63a;--accent:#5b95e8;--accent-ink:#0b0e11;--soft:#1d2227}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 var(--sans)}
+main{max-width:1080px;margin:0 auto;padding:20px 16px 40px}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+header h1{font-size:20px;margin:0;font-weight:700}
+header .who{display:flex;gap:10px;align-items:center;color:var(--muted);font-size:14px}
+h2{font-size:16px;margin:0 0 10px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:16px 18px;margin-bottom:16px}
+.grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+.grid .card{margin-bottom:0}
+.muted{color:var(--muted)}.pos{color:var(--up)}.neg{color:var(--down)}.amb{color:var(--amber)}
+.big{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.row{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-top:1px solid var(--line);font-size:14px}
+.row:first-of-type{border-top:0}
+button,.btn{font:600 14px var(--sans);border-radius:6px;border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink);padding:8px 14px;cursor:pointer}
+button.ghost{background:transparent;color:var(--accent)}
+button.danger{background:transparent;border-color:var(--down);color:var(--down)}
+button:disabled{opacity:.55;cursor:default}
+input[type=text],input[type=email],input[type=password],input[type=number],textarea{font:14px var(--sans);width:100%;padding:8px 10px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
+textarea{font-family:var(--mono);font-size:12px;min-height:90px}
+label{display:block;font-size:13px;font-weight:600;margin:10px 0 4px}
+.check{display:flex;align-items:center;gap:8px;font-weight:500;font-size:14px;margin:6px 0}
+.check input{width:auto}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg button{border:0;border-radius:0;background:transparent;color:var(--ink);font-weight:600}
+.seg button.on{background:var(--accent);color:var(--accent-ink)}
+.msg{font-size:14px;margin-top:8px;min-height:20px}
+.banner{border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:14px;border:1px solid}
+.banner.warn{border-color:var(--amber);color:var(--amber);background:color-mix(in srgb,var(--amber) 8%,transparent)}
+.banner.bad{border-color:var(--down);color:var(--down);background:color-mix(in srgb,var(--down) 8%,transparent)}
+.badge{display:inline-block;font-size:12px;font-weight:700;padding:2px 8px;border-radius:4px;border:1px solid currentColor;vertical-align:middle}
+.checks{list-style:none;padding:0;margin:8px 0 0}
+.checks li{display:flex;gap:8px;align-items:flex-start;font-size:14px;padding:3px 0}
+.dot{width:10px;height:10px;border-radius:50%;margin-top:6px;flex:none;background:var(--line)}
+.dot.ok{background:var(--up)}.dot.no{background:var(--down)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:7px 8px;border-top:1px solid var(--line);text-align:right;white-space:nowrap}
+th{font-size:12px;color:var(--muted);font-weight:600;border-top:0}
+th.l,td.l{text-align:left}
+.scroll{overflow-x:auto;max-height:420px;overflow-y:auto}
+.tag{font-size:11px;font-weight:700;padding:1px 6px;border-radius:4px;background:var(--soft);color:var(--muted)}
+.tag.real{background:color-mix(in srgb,var(--up) 15%,transparent);color:var(--up)}
+.log{font:12px/1.6 var(--mono);white-space:pre-wrap;max-height:260px;overflow:auto;margin:0;color:var(--muted)}
+.tabs{display:flex;gap:6px;margin-bottom:12px}
+.tabs button{background:transparent;color:var(--muted);border-color:var(--line)}
+.tabs button.on{color:var(--ink);border-color:var(--ink)}
+.auth{max-width:420px;margin:40px auto}
+.small{font-size:13px}
+footer{margin-top:24px;font-size:13px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap}
+footer a{color:var(--muted)}
+a{color:var(--accent)}
+.hidden{display:none!important}
+ol.steps{padding-left:20px;margin:6px 0;font-size:14px}
+ol.steps li{margin:3px 0}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <h1>Kalshi 15-Minute Bot</h1>
+  <div class="who hidden" id="who"><span id="whoEmail"></span><button class="ghost" id="signOut" type="button">Sign out</button></div>
+</header>
+
+<!-- ============ signed out ============ -->
+<section id="authView" class="auth hidden">
+  <div class="card">
+    <div class="tabs" role="tablist">
+      <button type="button" class="on" id="tabIn" role="tab">Sign in</button>
+      <button type="button" id="tabUp" role="tab">Create account</button>
+    </div>
+    <form id="authForm">
+      <label for="email">Email</label><input type="email" id="email" autocomplete="email" required>
+      <label for="password">Password</label><input type="password" id="password" autocomplete="current-password" minlength="8" required>
+      <p class="small muted" id="upNote" style="display:none;margin:8px 0 0">Accounts are invite only. Use the email address you were invited with. Passwords need at least 8 characters.</p>
+      <div style="margin-top:14px"><button type="submit" id="authBtn">Sign in</button></div>
+      <div class="msg" id="authMsg" role="status"></div>
+    </form>
+  </div>
+  <p class="small muted">This site runs a trading strategy on Kalshi's 15-minute Bitcoin and Ethereum markets for your own Kalshi account. Every account starts in Paper mode, which records trades without spending money.</p>
+</section>
+
+<!-- ============ signed in ============ -->
+<section id="appView" class="hidden">
+  <div id="banners"></div>
+
+  <div class="grid">
+    <div class="card"><h2>Mode</h2><div class="big" id="sMode">--</div><div class="small muted" id="sModeNote"></div></div>
+    <div class="card"><h2>Kalshi balance</h2><div class="big num" id="sBal">--</div><div class="small muted" id="sBalNote">Connect your Kalshi key to see it</div></div>
+    <div class="card"><h2>Next decision</h2><div class="big num" id="sNext">--</div><div class="small muted" id="sNextNote">The bot decides with 1:00 left in each 15-minute market</div></div>
+  </div>
+
+  <div class="grid" style="margin-top:16px">
+    <div class="card" id="mBTC"></div>
+    <div class="card" id="mETH"></div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <h2>Your results</h2>
+    <div class="scroll"><table id="results"></table></div>
+    <p class="small muted" style="margin:10px 0 0" id="stratLine"></p>
+  </div>
+
+  <div class="card">
+    <h2>Your trades</h2>
+    <div class="scroll"><table id="trades"></table></div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Kalshi connection</h2>
+      <div id="keyOn" class="hidden">
+        <p style="margin:0 0 8px">Connected with key <span class="num" id="keyIdShow"></span>.</p>
+        <p class="small muted" style="margin:0 0 12px">Your private key is stored encrypted on the server and is never shown again. To change it, remove it and connect a new one.</p>
+        <button type="button" class="ghost" id="refreshBal">Refresh balance</button>
+        <button type="button" class="danger" id="removeKey">Remove key</button>
+      </div>
+      <form id="keyForm">
+        <ol class="steps">
+          <li>On kalshi.com open Account, then API keys, and create a key.</li>
+          <li>Kalshi downloads a private key file. Keep it somewhere safe.</li>
+          <li>Paste the Key ID below and choose that file (or paste its text).</li>
+        </ol>
+        <label for="keyId">Key ID</label><input type="text" id="keyId" autocomplete="off" spellcheck="false" placeholder="1a2b3c4d-...">
+        <label for="keyFile">Private key file</label><input type="file" id="keyFile" accept=".pem,.txt,.key,text/plain">
+        <label for="keyPem">or paste the key text</label><textarea id="keyPem" spellcheck="false" placeholder="-----BEGIN RSA PRIVATE KEY-----"></textarea>
+        <div style="margin-top:12px"><button type="submit" id="keyBtn">Connect and test</button></div>
+        <div class="msg" id="keyMsg" role="status"></div>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>Settings</h2>
+      <label>Trading mode</label>
+      <div class="seg" role="group" aria-label="Trading mode"><button type="button" id="mPaper">Paper</button><button type="button" id="mLive">Live</button></div>
+      <label class="check"><input type="checkbox" id="ack"> I understand Live mode places real orders with my money and can lose it.</label>
+      <label>Markets</label>
+      <label class="check"><input type="checkbox" id="cBTC"> Bitcoin</label>
+      <label class="check"><input type="checkbox" id="cETH"> Ethereum</label>
+      <label for="betPct">Bet size (% of crypto balance per trade)</label><input type="number" id="betPct" min="1" max="25" step="0.5">
+      <label for="maxBet">Largest single bet ($)</label><input type="number" id="maxBet" min="1" step="1">
+      <label for="stopBelow">Pause live trading if balance falls below ($, 0 = off)</label><input type="number" id="stopBelow" min="0" step="1">
+      <label for="dailyLoss">Daily loss limit ($)</label><input type="number" id="dailyLoss" min="1" step="1">
+      <div style="margin-top:14px"><button type="button" id="saveSet">Save settings</button></div>
+      <div class="msg" id="setMsg" role="status"></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <h2>Activity</h2>
+    <pre class="log" id="log">Loading...</pre>
+  </div>
+
+  <div class="card">
+    <h2>How it works</h2>
+    <p style="margin-top:0">Kalshi runs a market every 15 minutes on whether Bitcoin (and Ethereum) will finish above a target price. With 1:00 left in each market, the bot checks three things:</p>
+    <ul class="small">
+      <li>The favorite costs between 65¢ and 85¢.</li>
+      <li>The gap between the buy and sell price is 5¢ or less.</li>
+      <li>The favorite's price has risen over the last 3 minutes.</li>
+    </ul>
+    <p>If all three pass, it buys the favorite. In Paper mode it records one practice contract. In Live mode it spends your chosen share of the cash in Kalshi's crypto account (exchange index 2).</p>
+    <p class="small muted" style="margin-bottom:0">Tested on 10½ months of past markets, this won about 81% of the time and made roughly 3¢ per contract after fees. Each loss costs about four wins, so losing weeks happen. Past results do not guarantee future ones. Start in Paper mode.</p>
+  </div>
+</section>
+
+<footer><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><span>Not affiliated with Kalshi.</span></footer>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+const SB_URL = "https://nyomnongkxpoqyqgztwk.supabase.co";
+const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im55b21ub25na3hwb3F5cWd6dHdrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMyOTUyNjAsImV4cCI6MjEwODg3MTI2MH0.RrfQ1bv1eevgj1drCPfmPbPh5OmPVyVhGdq6VPLxQjM";
+const sb = supabase.createClient(SB_URL, SB_KEY);
+const $ = (id) => document.getElementById(id);
+const usd = (v) => v == null ? "--" : (v < 0 ? "-$" : "$") + Math.abs(v).toFixed(2);
+const sgnUsd = (v) => v == null ? "--" : (v >= 0 ? "+" : "-") + "$" + Math.abs(v).toFixed(2);
+const cents = (v) => v == null ? "--" : (v >= 0 ? "+" : "") + v.toFixed(1) + "¢";
+const cls = (v) => v > 0 ? "pos" : v < 0 ? "neg" : "";
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const tm = (iso) => new Date(iso).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+const fee = (p) => 0.07 * p * (1 - p);
+let session = null, A = null, Q = [], SIG = [], TR = [], EV = [], mode = "paper", timer = null;
+
+// ---------- auth ----------
+let signingUp = false;
+function setTab(up) {
+  signingUp = up; $("tabIn").classList.toggle("on", !up); $("tabUp").classList.toggle("on", up);
+  $("authBtn").textContent = up ? "Create account" : "Sign in"; $("upNote").style.display = up ? "block" : "none";
+  $("password").autocomplete = up ? "new-password" : "current-password"; $("authMsg").textContent = "";
+}
+$("tabIn").onclick = () => setTab(false); $("tabUp").onclick = () => setTab(true);
+$("authForm").onsubmit = async (e) => {
+  e.preventDefault(); const email = $("email").value.trim(), password = $("password").value;
+  $("authBtn").disabled = true; $("authMsg").className = "msg muted"; $("authMsg").textContent = signingUp ? "Creating your account..." : "Signing in...";
+  try {
+    if (signingUp) {
+      const r = await callFn({ action: "signup", email, password }, false);
+      if (r.error) throw new Error(r.error);
+    }
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) throw new Error(error.message === "Invalid login credentials" ? "Wrong email or password." : error.message);
+  } catch (err) { $("authMsg").className = "msg neg"; $("authMsg").textContent = err.message; }
+  $("authBtn").disabled = false;
+};
+$("signOut").onclick = () => sb.auth.signOut();
+
+async function callFn(body, auth = true) {
+  const headers = { "Content-Type": "application/json", apikey: SB_KEY };
+  if (auth && session) headers.Authorization = "Bearer " + session.access_token;
+  const r = await fetch(SB_URL + "/functions/v1/account", { method: "POST", headers, body: JSON.stringify(body) });
+  try { return await r.json(); } catch (_) { return { error: "Server error (" + r.status + ")" }; }
+}
+
+sb.auth.onAuthStateChange((_ev, s) => {
+  session = s;
+  $("authView").classList.toggle("hidden", !!s); $("appView").classList.toggle("hidden", !s); $("who").classList.toggle("hidden", !s);
+  if (s) { $("whoEmail").textContent = s.user.email; load(true); clearInterval(timer); timer = setInterval(load, 5000); }
+  else { clearInterval(timer); A = null; }
+});
+
+// ---------- data ----------
+let firstSettings = true;
+async function load(force) {
+  if (!session) return;
+  const since = new Date(Date.now() - 7 * 60 * 1000).toISOString();
+  const [a, q, s, t, e] = await Promise.all([
+    sb.from("accounts").select("*").maybeSingle(),
+    sb.from("quotes").select("coin,ticker,ts,left_s,yb,ya,nb,na").gte("ts", since).order("ts", { ascending: true }).limit(1000),
+    sb.from("signals").select("*").order("decided_at", { ascending: false }).limit(400),
+    sb.from("trades").select("*").order("created_at", { ascending: false }).limit(500),
+    sb.from("events").select("ts,msg,user_id").order("ts", { ascending: false }).limit(40),
+  ]);
+  A = a.data; Q = q.data || []; SIG = s.data || []; TR = t.data || []; EV = e.data || [];
+  if (!A) { $("banners").innerHTML = '<div class="banner bad">This login has no bot account. Ask the person who invited you to check your invite.</div>'; return; }
+  if (firstSettings || force) { fillSettings(); firstSettings = false; }
+  render();
+}
+
+function fillSettings() {
+  mode = A.mode; $("ack").checked = A.mode === "live";
+  $("cBTC").checked = A.trade_btc; $("cETH").checked = A.trade_eth;
+  $("betPct").value = +(A.bet_pct * 100).toFixed(2); $("maxBet").value = +A.max_bet; $("stopBelow").value = +A.stop_below; $("dailyLoss").value = +A.max_daily_loss;
+  paintMode();
+}
+function paintMode() { $("mPaper").classList.toggle("on", mode === "paper"); $("mLive").classList.toggle("on", mode === "live"); }
+$("mPaper").onclick = () => { mode = "paper"; paintMode(); };
+$("mLive").onclick = () => { mode = "live"; paintMode(); };
+
+$("saveSet").onclick = async () => {
+  const m = $("setMsg"); m.className = "msg muted";
+  if (mode === "live" && !A.key_ok) { m.className = "msg neg"; m.textContent = "Connect a working Kalshi key before switching to Live."; return; }
+  if (mode === "live" && !$("ack").checked) { m.className = "msg neg"; m.textContent = "Tick the box to confirm you understand Live mode uses real money."; return; }
+  const bet = Number($("betPct").value) / 100;
+  if (!(bet >= 0.01 && bet <= 0.25)) { m.className = "msg neg"; m.textContent = "Bet size must be between 1% and 25%."; return; }
+  const patch = { mode, trade_btc: $("cBTC").checked, trade_eth: $("cETH").checked, bet_pct: bet,
+    max_bet: Math.max(1, Number($("maxBet").value) || 100), stop_below: Math.max(0, Number($("stopBelow").value) || 0), max_daily_loss: Math.max(1, Number($("dailyLoss").value) || 10) };
+  m.textContent = "Saving...";
+  const { error } = await sb.from("accounts").update(patch).eq("user_id", A.user_id);
+  if (error) { m.className = "msg neg"; m.textContent = error.message; return; }
+  m.className = "msg pos"; m.textContent = mode === "live" ? "Saved. Live mode is on: the next signal will place a real order." : "Saved.";
+  load(true);
+};
+
+$("keyFile").onchange = async () => { const f = $("keyFile").files[0]; if (f) $("keyPem").value = (await f.text()).trim(); };
+$("keyForm").onsubmit = async (e) => {
+  e.preventDefault(); const m = $("keyMsg");
+  const key_id = $("keyId").value.trim(), pem = $("keyPem").value.trim();
+  if (!key_id || !pem) { m.className = "msg neg"; m.textContent = "Enter the Key ID and choose the key file."; return; }
+  $("keyBtn").disabled = true; m.className = "msg muted"; m.textContent = "Testing the key with Kalshi...";
+  const r = await callFn({ action: "save_key", key_id, pem });
+  $("keyBtn").disabled = false;
+  if (r.error) { m.className = "msg neg"; m.textContent = r.error; return; }
+  $("keyPem").value = ""; $("keyFile").value = ""; $("keyId").value = "";
+  m.className = "msg pos"; m.textContent = `Connected. Kalshi balance ${usd(r.balance)}, crypto account ${usd(r.shard)}.`;
+  load(true);
+};
+$("removeKey").onclick = async () => {
+  if (!confirm("Remove your Kalshi key from this site? Live trading will stop.")) return;
+  const r = await callFn({ action: "remove_key" }); if (r.error) alert(r.error); load(true);
+};
+$("refreshBal").onclick = async () => { const r = await callFn({ action: "refresh" }); if (r.error) alert(r.error); load(); };
+
+// ---------- render ----------
+function nextDecision() {
+  const now = new Date(); const t = new Date(now); t.setSeconds(0, 0);
+  for (let i = 0; i < 20; i++) { const mm = t.getMinutes(); if ([14, 29, 44, 59].includes(mm) && t > now) return t; t.setMinutes(mm + 1); }
+  return t;
+}
+function render() {
+  // banners
+  const b = [];
+  if (A.paused_reason) b.push(`<div class="banner bad"><b>Live trading paused:</b> ${esc(A.paused_reason)}. Fix the cause, then switch to Paper and back to Live and save.</div>`);
+  if (A.mode === "live" && A.shard_balance != null && A.shard_balance < 1) b.push(`<div class="banner warn">Your crypto account on Kalshi has ${usd(A.shard_balance)}, so real orders can't go through. Move cash to exchange index 2 at <a href="https://kalshi.com/account/exchange-indexes" target="_blank" rel="noopener">kalshi.com/account/exchange-indexes</a>.</div>`);
+  $("banners").innerHTML = b.join("");
+  // status
+  $("sMode").innerHTML = A.mode === "live" ? '<span class="pos">Live</span>' : "Paper";
+  $("sModeNote").textContent = A.mode === "live" ? `Real orders, ${(A.bet_pct * 100).toFixed(1)}% per trade, max ${usd(+A.max_bet)}` : "Practice trades only, no money spent";
+  $("sBal").textContent = A.balance == null ? "--" : usd(+A.balance);
+  $("sBalNote").textContent = A.balance == null ? (A.key_ok ? "Waiting for the first check" : "Connect your Kalshi key to see it") : `Crypto account ${usd(+A.shard_balance)} · checked ${tm(A.balance_at)}`;
+  // key
+  $("keyOn").classList.toggle("hidden", !A.key_ok); $("keyForm").classList.toggle("hidden", !!A.key_ok);
+  $("keyIdShow").textContent = A.kalshi_key_id ? A.kalshi_key_id.slice(0, 8) + "..." : "";
+  // markets
+  for (const [coin, el] of [["Bitcoin", "mBTC"], ["Ethereum", "mETH"]]) $(el).innerHTML = marketCard(coin);
+  renderResults(); renderTrades();
+  $("log").textContent = EV.length ? EV.map((e) => `${tm(e.ts)}  ${e.user_id ? "" : "[market] "}${e.msg}`).join("\n") : "Nothing yet.";
+}
+function marketCard(coin) {
+  const qs = Q.filter((q) => q.coin === coin); const last = qs[qs.length - 1];
+  const enabled = coin === "Bitcoin" ? A.trade_btc : A.trade_eth;
+  const lastSig = SIG.find((s) => s.coin === coin);
+  let sigLine = lastSig ? `<div class="small muted" style="margin-top:10px">Last decision ${tm(lastSig.decided_at)}: ${lastSig.passed ? `<b>took ${lastSig.side === "yes" ? "Yes" : "No"} at ${(lastSig.price * 100).toFixed(0)}¢</b>${lastSig.result ? (lastSig.result === lastSig.side ? ' <span class="pos">won</span>' : ' <span class="neg">lost</span>') : " (waiting)"}` : "skipped (" + esc(lastSig.reason) + ")"}</div>` : "";
+  const head = `<h2>${coin} ${enabled ? "" : '<span class="tag">off</span>'}</h2>`;
+  const age = last ? (Date.now() - Date.parse(last.ts)) / 1000 : 1e9;
+  if (!last || age > 20) {
+    return head + `<p class="muted" style="margin:0">Not watching right now. The bot watches the last 5 minutes of each market and decides at 1:00 left.</p>` + sigLine;
+  }
+  const left = Math.max(0, last.left_s - age), mid = (+last.ya + +last.yb) / 2;
+  const side = mid >= 0.5 ? "yes" : "no", price = side === "yes" ? +last.ya : +last.na, fav = side === "yes" ? mid : 1 - mid;
+  const old = qs.filter((q) => Date.parse(q.ts) <= Date.parse(last.ts) - 180000).pop();
+  let trend = null; if (old) { const om = (+old.ya + +old.yb) / 2; trend = fav - (side === "yes" ? om : 1 - om); }
+  const checks = [
+    { ok: price >= 0.65 && price <= 0.85, t: `Favorite costs 65-85¢ (now ${(price * 100).toFixed(0)}¢)` },
+    { ok: +last.ya - +last.yb <= 0.05, t: `Buy/sell gap 5¢ or less (now ${((+last.ya - +last.yb) * 100).toFixed(0)}¢)` },
+    { ok: trend != null && trend > 0, t: trend == null ? "Favorite rising over 3 min (collecting)" : `Favorite rising over 3 min (${trend >= 0 ? "+" : ""}${(trend * 100).toFixed(1)}¢)` },
+  ];
+  const mm = Math.floor(left / 60), ss = Math.floor(left % 60);
+  return head + `<div class="row"><span>Time left</span><span class="num">${mm}:${String(ss).padStart(2, "0")}</span></div>
+    <div class="row"><span>Leaning</span><span><b class="${side === "yes" ? "pos" : "neg"}">${side === "yes" ? "Over" : "Under"}</b> ${Math.round(fav * 100)}%</span></div>
+    <div class="row"><span>Prices</span><span class="num">Yes ${(+last.ya * 100).toFixed(0)}¢ · No ${(+last.na * 100).toFixed(0)}¢</span></div>
+    <ul class="checks">${checks.map((c) => `<li><span class="dot ${c.ok ? "ok" : "no"}"></span><span>${c.t}</span></li>`).join("")}</ul>` + sigLine;
+}
+function renderResults() {
+  const rows = [];
+  for (const coin of ["Bitcoin", "Ethereum", "All"]) {
+    for (const live of [true, false]) {
+      const ts = TR.filter((t) => t.live === live && (coin === "All" || t.coin === coin)); const done = ts.filter((t) => t.result);
+      const wins = done.filter((t) => t.result === t.side).length; const pnl = done.reduce((a, t) => a + +t.pnl, 0);
+      const perC = done.length ? done.reduce((a, t) => a + +t.pnl / +t.contracts, 0) / done.length * 100 : null;
+      rows.push(`<tr${coin === "All" ? ' style="font-weight:600"' : ""}><td class="l">${coin}</td><td class="l">${live ? '<span class="tag real">real</span>' : '<span class="tag">paper</span>'}</td><td>${ts.length}${ts.length > done.length ? ` <span class="muted">(${ts.length - done.length} open)</span>` : ""}</td><td>${done.length ? `${wins} of ${done.length} (${Math.round(wins / done.length * 100)}%)` : "--"}</td><td class="${cls(perC)}">${cents(perC)}</td><td class="${cls(pnl)}">${live ? sgnUsd(done.length ? pnl : null) : "--"}</td></tr>`);
+    }
+  }
+  $("results").innerHTML = '<tr><th class="l">Coin</th><th class="l">Type</th><th>Trades</th><th>Won</th><th>Avg per contract</th><th>Profit</th></tr>' + rows.join("");
+  const ss = SIG.filter((s) => s.passed && s.result); const w = ss.filter((s) => s.result === s.side).length;
+  const avg = ss.length ? ss.reduce((a, s) => a + ((s.result === s.side ? 1 - s.price : -s.price) - fee(+s.price)), 0) / ss.length * 100 : null;
+  $("stratLine").innerHTML = ss.length ? `Strategy record on this site (every signal, both coins): ${w} of ${ss.length} won, <span class="${cls(avg)}">${cents(avg)}</span> per contract. Testing expects about 81% and +3¢ over time.` : "The strategy record fills in after the first signals settle.";
+}
+function renderTrades() {
+  if (!TR.length) { $("trades").innerHTML = '<tr><td class="l muted">No trades yet. The first one appears the next time all three checks pass (a few times a day).</td></tr>'; return; }
+  $("trades").innerHTML = '<tr><th class="l">Time</th><th class="l">Coin</th><th class="l">Type</th><th>Bought</th><th>Price</th><th>Contracts</th><th>Result</th><th>Profit</th><th class="l">Note</th></tr>' +
+    TR.map((t) => `<tr><td class="l">${tm(t.created_at)}</td><td class="l">${t.coin}</td><td class="l">${t.live ? '<span class="tag real">real</span>' : '<span class="tag">paper</span>'}</td><td>${t.side === "yes" ? "Yes" : "No"}</td><td class="num">${(t.price * 100).toFixed(1)}¢</td><td class="num">${(+t.contracts).toFixed(2)}</td><td>${t.result ? (t.result === t.side ? '<span class="pos">Won</span>' : '<span class="neg">Lost</span>') : '<span class="muted">waiting</span>'}</td><td class="${cls(+t.pnl)} num">${t.pnl == null ? "--" : sgnUsd(+t.pnl)}</td><td class="l small muted">${esc(t.note || "")}</td></tr>`).join("");
+}
+setInterval(() => {
+  const n = nextDecision(), s = Math.max(0, Math.round((n - Date.now()) / 1000));
+  $("sNext").textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+  $("sNextNote").textContent = `At ${n.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}, with 1:00 left in the current markets`;
+  if (A && session) for (const [coin, el] of [["Bitcoin", "mBTC"], ["Ethereum", "mETH"]]) $(el).innerHTML = marketCard(coin);
+}, 1000);
+sb.auth.getSession().then(({ data }) => { if (!data.session) { $("authView").classList.remove("hidden"); } });
+</script>
+</body>
+</html>
