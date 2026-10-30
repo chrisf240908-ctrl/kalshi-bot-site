@@ -353,7 +353,7 @@ function renderResults() {
       const ts = TR.filter((t) => t.live === live && (coin === "All" || t.coin === coin)); const done = ts.filter((t) => t.result);
       const wins = done.filter((t) => t.result === t.side).length; const pnl = done.reduce((a, t) => a + +t.pnl, 0);
       const perC = done.length ? done.reduce((a, t) => a + +t.pnl / +t.contracts, 0) / done.length * 100 : null;
-      rows.push(`<tr${coin === "All" ? ' style="font-weight:600"' : ""}><td class="l">${coin}</td><td class="l">${live ? '<span class="tag real">real</span>' : '<span class="tag">paper</span>'}</td><td>${ts.length}${ts.length > done.length ? ` <span class="muted">(${ts.length - done.length} open)</span>` : ""}</td><td>${done.length ? `${wins} of ${done.length} (${Math.round(wins / done.length * 100)}%)` : "--"}</td><td class="${cls(perC)}">${cents(perC)}</td><td class="${cls(pnl)}">${live ? sgnUsd(done.length ? pnl : null) : "--"}</td></tr>`);
+      rows.push(`<tr${coin === "All" ? ' style="font-weight:600"' : ""}><td class="l">${coin}</td><td class="l">${live ? '<span class="tag real">real</span>' : '<span class="tag">paper</span>'}</td><td>${ts.length}${ts.length > done.length ? ` <span class="muted">(${ts.length - done.length} open)</span>` : ""}</td><td>${done.length ? `${wins} of ${done.length} (${Math.round(wins / done.length * 100)}%)` : "--"}</td><td class="${cls(perC)}">${cents(perC)}</td><td class="${live && done.length ? cls(pnl) : "muted"}">${live ? sgnUsd(done.length ? pnl : null) : "--"}</td></tr>`);
     }
   }
   $("results").innerHTML = '<tr><th class="l">Coin</th><th class="l">Type</th><th>Trades</th><th>Won</th><th>Avg per contract</th><th>Profit</th></tr>' + rows.join("");
