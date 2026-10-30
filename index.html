@@ -464,7 +464,7 @@ function goldRecord() {
   const pc = (x) => ((x.result === x.side ? 1 - x.price : -x.price) - fee(+x.price)) * 100;
   const tot = done.reduce((a, x) => a + pc(x), 0);
   let bal = 26, peak = 26, dd = 0;
-  for (const x of done) { const p = +x.price; bal += bal * 0.025 / (p + fee(p)) * (pc(x) / 100); peak = Math.max(peak, bal); dd = Math.max(dd, 1 - bal / peak); }
+  for (const x of done) { const p = +x.price; bal += bal * 0.05 / (p + fee(p)) * (pc(x) / 100); peak = Math.max(peak, bal); dd = Math.max(dd, 1 - bal / peak); }
   return { G, done, w, tot, pc, bal, dd };
 }
 function goldHtml() {
@@ -474,7 +474,7 @@ function goldHtml() {
       <div class="row"><span>Win rate</span><span>${R.done.length ? (R.w / R.done.length * 100).toFixed(1) + "%" : "--"} <span class="muted">(target ~96%)</span></span></div>
       <div class="row"><span>Avg per contract</span><span class="${cls(R.tot)}">${R.done.length ? cents(R.tot / R.done.length) : "--"} <span class="muted">(target +1 to +3¢)</span></span></div>
       <div class="row"><span>Open trades</span><span>${R.G.length - R.done.length}</span></div></section>
-    <section><h4>$26 at 2.5% per trade would be</h4><div class="val ${cls(R.bal - 26)}">${usd(R.bal)}</div>
+    <section><h4>$26 at 5% per trade would be</h4><div class="val ${cls(R.bal - 26)}">${usd(R.bal)}</div>
       <div class="row"><span>Change</span><span class="${cls(R.bal - 26)}">${sgnUsd(R.bal - 26)}</span></div>
       <div class="row"><span>Worst drop</span><span>${(R.dd * 100).toFixed(0)}%</span></div>
       <p class="small muted" style="margin:6px 0 0">${R.done.length < 150 ? "Too early to judge: about 150-200 trades (2-3 weeks) needed." : "Enough trades to start judging."}</p></section>`;
