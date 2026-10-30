@@ -67,6 +67,25 @@ footer a{color:var(--muted)}
 a{color:var(--accent)}
 .hidden{display:none!important}
 ol.steps{padding-left:20px;margin:6px 0;font-size:14px}
+.adv-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+.adv-head p{margin:0;max-width:640px}
+.coinhead{display:flex;align-items:baseline;gap:10px;margin:18px 0 2px}
+.coinhead h3{margin:0;font-size:15px;color:var(--muted);font-weight:600}
+.verdict{font-size:30px;font-weight:700;line-height:1.15;margin:2px 0 4px}
+.verdict.take{color:var(--up)}.verdict.take.under{color:var(--down)}.verdict.skip{color:var(--down)}.verdict.early,.verdict.ready,.verdict.closed{color:var(--amber)}
+.detail{margin:0 0 10px;color:var(--muted);font-size:14px}
+.rope{position:relative;height:12px;margin:14px 6px 4px}
+.rope .track{position:absolute;inset:3px 0;border-radius:3px;background:linear-gradient(90deg,var(--down),var(--line) 50%,var(--up))}
+.rope .mid{position:absolute;left:50%;top:-3px;bottom:-3px;width:1px;background:var(--muted)}
+.rope .knot{position:absolute;top:-4px;width:20px;height:20px;margin-left:-10px;border-radius:50%;border:3px solid var(--surface);box-shadow:0 0 0 1px var(--line);transition:left .5s}
+.ends{display:flex;justify-content:space-between;font-size:12px;font-weight:600;margin:4px 0 6px}
+.ends .u{color:var(--down)}.ends .o{color:var(--up)}
+.leanline{font-size:15px;font-weight:600;margin-bottom:12px}
+.agrid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+.agrid section{border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+.agrid h4{margin:0 0 6px;font-size:13px;color:var(--muted);font-weight:600}
+.agrid .val{font-size:20px;font-weight:700;margin-bottom:4px;font-variant-numeric:tabular-nums}
+.sep{border:0;border-top:1px solid var(--line);margin:22px 0 0}
 ol.steps li{margin:3px 0}
 </style>
 </head>
@@ -105,15 +124,26 @@ ol.steps li{margin:3px 0}
     <div class="card"><h2>Next decision</h2><div class="big num" id="sNext">--</div><div class="small muted" id="sNextNote">The bot decides with 1:00 left in each 15-minute market</div></div>
   </div>
 
-  <div class="grid" style="margin-top:16px">
-    <div class="card" id="mBTC"></div>
-    <div class="card" id="mETH"></div>
+  <div class="card" style="margin-top:16px" id="advisor">
+    <div class="adv-head">
+      <div><h2 style="margin-bottom:4px">Advisor</h2><p class="small muted">The live call for the markets running right now. Updates every few seconds. The bot trades on its own; this shows what it sees.</p></div>
+      <div><button type="button" class="ghost" id="alertBtn">Turn on alerts</button> <span class="small muted" id="alertNote"></span></div>
+    </div>
+    <div id="advBitcoin"></div>
+    <hr class="sep">
+    <div id="advEthereum"></div>
   </div>
 
   <div class="card" style="margin-top:16px">
     <h2>Your results</h2>
     <div class="scroll"><table id="results"></table></div>
     <p class="small muted" style="margin:10px 0 0" id="stratLine"></p>
+  </div>
+
+  <div class="card">
+    <h2>How every strategy is doing</h2>
+    <p class="small muted" style="margin:0 0 8px">Paper tests of other ways to trade these markets, run on the same live prices for comparison. Profit is per contract, after the fee. Only the optimized strategy trades for accounts.</p>
+    <div class="scroll"><table id="compare"></table></div>
   </div>
 
   <div class="card">
@@ -195,7 +225,7 @@ const cls = (v) => v > 0 ? "pos" : v < 0 ? "neg" : "";
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const tm = (iso) => new Date(iso).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 const fee = (p) => 0.07 * p * (1 - p);
-let session = null, A = null, Q = [], SIG = [], TR = [], EV = [], mode = "paper", timer = null;
+let session = null, A = null, Q = [], SIG = [], TR = [], EV = [], ST = [], CS = {}, mode = "paper", timer = null, qtimer = null, lastQ = null;
 
 // ---------- auth ----------
 let signingUp = false;
@@ -230,26 +260,36 @@ async function callFn(body, auth = true) {
 sb.auth.onAuthStateChange((_ev, s) => {
   session = s;
   $("authView").classList.toggle("hidden", !!s); $("appView").classList.toggle("hidden", !s); $("who").classList.toggle("hidden", !s);
-  if (s) { $("whoEmail").textContent = s.user.email; load(true); clearInterval(timer); timer = setInterval(load, 5000); }
-  else { clearInterval(timer); A = null; }
+  if (s) { $("whoEmail").textContent = s.user.email; Q = []; lastQ = null; load(true); loadQuotes(); clearInterval(timer); clearInterval(qtimer); timer = setInterval(load, 8000); qtimer = setInterval(loadQuotes, 3000); }
+  else { clearInterval(timer); clearInterval(qtimer); A = null; }
 });
 
 // ---------- data ----------
 let firstSettings = true;
 async function load(force) {
   if (!session) return;
-  const since = new Date(Date.now() - 7 * 60 * 1000).toISOString();
-  const [a, q, s, t, e] = await Promise.all([
+  const [a, s, t, e, st, cs] = await Promise.all([
     sb.from("accounts").select("*").maybeSingle(),
-    sb.from("quotes").select("coin,ticker,ts,left_s,yb,ya,nb,na").gte("ts", since).order("ts", { ascending: true }).limit(1000),
-    sb.from("signals").select("*").order("decided_at", { ascending: false }).limit(400),
+    sb.from("signals").select("*").order("decided_at", { ascending: false }).limit(1000),
     sb.from("trades").select("*").order("created_at", { ascending: false }).limit(500),
     sb.from("events").select("ts,msg,user_id").order("ts", { ascending: false }).limit(40),
+    sb.from("strat_signals").select("strategy,coin,side,price,result").eq("passed", true).order("decided_at", { ascending: false }).limit(5000),
+    sb.from("coin_state").select("coin,sigma,updated_at"),
   ]);
-  A = a.data; Q = q.data || []; SIG = s.data || []; TR = t.data || []; EV = e.data || [];
+  A = a.data; SIG = s.data || []; TR = t.data || []; EV = e.data || []; ST = st.data || [];
+  CS = {}; for (const r of cs.data || []) CS[r.coin] = +r.sigma;
   if (!A) { $("banners").innerHTML = '<div class="banner bad">This login has no bot account. Ask the person who invited you to check your invite.</div>'; return; }
   if (firstSettings || force) { fillSettings(); firstSettings = false; }
   render();
+}
+
+async function loadQuotes() {
+  if (!session) return;
+  let qy = sb.from("quotes").select("coin,ticker,ts,left_s,yb,ya,nb,na,spot,target").order("ts", { ascending: true }).limit(1000);
+  qy = lastQ ? qy.gt("ts", lastQ) : qy.gte("ts", new Date(Date.now() - 7 * 60 * 1000).toISOString());
+  const { data } = await qy;
+  if (data && data.length) { Q = Q.concat(data); lastQ = data[data.length - 1].ts; }
+  const cut = Date.now() - 7 * 60 * 1000; Q = Q.filter((q) => Date.parse(q.ts) >= cut);
 }
 
 function fillSettings() {
@@ -316,35 +356,122 @@ function render() {
   // key
   $("keyOn").classList.toggle("hidden", !A.key_ok); $("keyForm").classList.toggle("hidden", !!A.key_ok);
   $("keyIdShow").textContent = A.kalshi_key_id ? A.kalshi_key_id.slice(0, 8) + "..." : "";
-  // markets
-  for (const [coin, el] of [["Bitcoin", "mBTC"], ["Ethereum", "mETH"]]) $(el).innerHTML = marketCard(coin);
-  renderResults(); renderTrades();
+  renderAdvisor(); renderResults(); renderCompare(); renderTrades();
   $("log").textContent = EV.length ? EV.map((e) => `${tm(e.ts)}  ${e.user_id ? "" : "[market] "}${e.msg}`).join("\n") : "Nothing yet.";
 }
-function marketCard(coin) {
+// ---------- advisor ----------
+const STATE = {};
+function normCdf(x) { const t = 1 / (1 + 0.3275911 * Math.abs(x) / Math.SQRT2); const y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-(x * x) / 2); return x >= 0 ? (1 + y) / 2 : (1 - y) / 2; }
+const fmtLeft = (s) => `${Math.floor(Math.max(0, s) / 60)}:${String(Math.floor(Math.max(0, s) % 60)).padStart(2, "0")}`;
+const money = (v, d = 2) => v == null || isNaN(v) ? "--" : "$" + Number(v).toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d });
+const sgnMoney = (v) => v == null || isNaN(v) ? "--" : (v >= 0 ? "+" : "-") + money(Math.abs(v));
+const strength = (x) => { const a = Math.abs(x); return a < 0.5 ? "normal" : a < 1.2 ? "firm" : a < 2 ? "strong" : "very strong"; };
+function advisorState(coin) {
   const qs = Q.filter((q) => q.coin === coin); const last = qs[qs.length - 1];
-  const enabled = coin === "Bitcoin" ? A.trade_btc : A.trade_eth;
-  const lastSig = SIG.find((s) => s.coin === coin);
-  let sigLine = lastSig ? `<div class="small muted" style="margin-top:10px">Last decision ${tm(lastSig.decided_at)}: ${lastSig.passed ? `<b>took ${lastSig.side === "yes" ? "Yes" : "No"} at ${(lastSig.price * 100).toFixed(0)}¢</b>${lastSig.result ? (lastSig.result === lastSig.side ? ' <span class="pos">won</span>' : ' <span class="neg">lost</span>') : " (waiting)"}` : "skipped (" + esc(lastSig.reason) + ")"}</div>` : "";
-  const head = `<h2>${coin} ${enabled ? "" : '<span class="tag">off</span>'}</h2>`;
-  const age = last ? (Date.now() - Date.parse(last.ts)) / 1000 : 1e9;
-  if (!last || age > 20) {
-    return head + `<p class="muted" style="margin:0">Not watching right now. The bot watches the last 5 minutes of each market and decides at 1:00 left.</p>` + sigLine;
-  }
-  const left = Math.max(0, last.left_s - age), mid = (+last.ya + +last.yb) / 2;
-  const side = mid >= 0.5 ? "yes" : "no", price = side === "yes" ? +last.ya : +last.na, fav = side === "yes" ? mid : 1 - mid;
-  const old = qs.filter((q) => Date.parse(q.ts) <= Date.parse(last.ts) - 180000).pop();
-  let trend = null; if (old) { const om = (+old.ya + +old.yb) / 2; trend = fav - (side === "yes" ? om : 1 - om); }
+  if (!last) return null;
+  const age = (Date.now() - Date.parse(last.ts)) / 1000;
+  if (age > 30) return { stale: true, age };
+  const mq = qs.filter((q) => q.ticker === last.ticker);
+  const left = last.left_s - age, ya = +last.ya, yb = +last.yb, na = +last.na, mid = (ya + yb) / 2;
+  const side = mid >= 0.5 ? "over" : "under", price = side === "over" ? ya : na, fav = side === "over" ? mid : 1 - mid;
+  const at = (secs) => mq.filter((q) => Date.parse(q.ts) <= Date.parse(last.ts) - secs * 1000).pop();
+  const o3 = at(180); let trend = null; if (o3) { const om = (+o3.ya + +o3.yb) / 2; trend = (fav - (side === "over" ? om : 1 - om)) * 100; }
   const checks = [
     { ok: price >= 0.65 && price <= 0.85, t: `Favorite costs 65-85¢ (now ${(price * 100).toFixed(0)}¢)` },
-    { ok: +last.ya - +last.yb <= 0.05, t: `Buy/sell gap 5¢ or less (now ${((+last.ya - +last.yb) * 100).toFixed(0)}¢)` },
-    { ok: trend != null && trend > 0, t: trend == null ? "Favorite rising over 3 min (collecting)" : `Favorite rising over 3 min (${trend >= 0 ? "+" : ""}${(trend * 100).toFixed(1)}¢)` },
+    { ok: ya - yb <= 0.05 && mid !== 0.5, t: `Buy/sell gap 5¢ or less (now ${((ya - yb) * 100).toFixed(0)}¢)` },
+    { ok: trend != null && trend > 0, t: trend == null ? "Favorite rising over the last 3 min (collecting)" : `Favorite rising over the last 3 min (${trend >= 0 ? "+" : ""}${trend.toFixed(1)}¢)` },
   ];
-  const mm = Math.floor(left / 60), ss = Math.floor(left % 60);
-  return head + `<div class="row"><span>Time left</span><span class="num">${mm}:${String(ss).padStart(2, "0")}</span></div>
-    <div class="row"><span>Leaning</span><span><b class="${side === "yes" ? "pos" : "neg"}">${side === "yes" ? "Over" : "Under"}</b> ${Math.round(fav * 100)}%</span></div>
-    <div class="row"><span>Prices</span><span class="num">Yes ${(+last.ya * 100).toFixed(0)}¢ · No ${(+last.na * 100).toFixed(0)}¢</span></div>
-    <ul class="checks">${checks.map((c) => `<li><span class="dot ${c.ok ? "ok" : "no"}"></span><span>${c.t}</span></li>`).join("")}</ul>` + sigLine;
+  const ok = checks.every((c) => c.ok);
+  const spot = last.spot != null ? +last.spot : null, target = last.target != null ? +last.target : null, sig = CS[coin];
+  let model = null, moves = null;
+  if (spot && target && sig) { const sd = spot * sig * Math.sqrt(Math.max(left - 40, 5)); moves = (spot - target) / sd; model = normCdf(moves); }
+  const mv = (secs) => { const o = at(secs); if (!o || o.spot == null || spot == null || !sig) return null; const chg = spot - +o.spot; return { usd: chg, x: chg / (spot * sig * Math.sqrt(secs)) }; };
+  const dec = SIG.find((s) => s.ticker === last.ticker);
+  let kind, title, detail;
+  if (left > 240) { kind = "early"; title = "Too early - watch"; detail = `The entry window opens at 1:00 left (in ${fmtLeft(left - 60)}). Buying earlier lost money in testing.`; }
+  else if (left > 60) { kind = "ready"; title = (ok ? "Lining up - " : "Get ready - ") + `window opens in ${fmtLeft(left - 60)}`; detail = "If all three checks are green at 1:00 left, the bot buys the favorite."; }
+  else if (left >= 40 && !dec) { kind = ok ? "take" : "skip"; title = ok ? `Take ${side.toUpperCase()} now` : "Skip this market"; detail = ok ? "All three checks passed. The bot is buying this for accounts with this coin turned on." : "Not every check passed at 1:00 left."; }
+  else if (dec) { kind = dec.passed ? "take" : "closed"; title = dec.passed ? `Taken: ${dec.side === "yes" ? "OVER" : "UNDER"} at ${(dec.price * 100).toFixed(0)}¢` : "Skipped this market"; detail = dec.passed ? "Result comes in when the market closes." : `Reason: ${dec.reason}. Next market starts in ${fmtLeft(left)}.`; }
+  else { kind = "closed"; title = "Window closed for this market"; detail = `Next market starts in ${fmtLeft(left)}.`; }
+  return { coin, ticker: last.ticker, left, ya, na, mid, side, fav, trend, checks, ok, spot, target, model, moves, m1: mv(60), m3: mv(180), kind, title, detail };
+}
+function opinionText(kOver, bOver) {
+  const d = (bOver - kOver) * 100, fav = kOver >= 0.5 ? "over" : "under", bFav = bOver >= 0.5 ? "over" : "under";
+  const txt = bFav !== fav ? `Disagrees: bot leans ${bFav}` : Math.abs(d) < 5 ? "Agrees with Kalshi" : ((d > 0) === (fav === "over") ? `Agrees, even more sure of ${fav}` : `Agrees, but less sure of ${fav}`);
+  return { d, txt };
+}
+function advisorHtml(coin) {
+  const S = advisorState(coin); const short = coin === "Bitcoin" ? "BTC" : "ETH";
+  const enabled = A ? (coin === "Bitcoin" ? A.trade_btc : A.trade_eth) : true;
+  const head = `<div class="coinhead"><h3>${coin}</h3>${enabled ? "" : '<span class="tag">off for your account</span>'}<span class="small muted num">${S && !S.stale ? fmtLeft(S.left) + " left" : ""}</span></div>`;
+  if (!S) return head + '<p class="muted">Waiting for the first prices...</p>';
+  if (S.stale) return head + `<p class="muted">No new prices for ${Math.round(S.age)}s. The server may be restarting; this refreshes on its own.</p>`;
+  STATE[coin] = S;
+  const lean = S.fav < 0.55 ? "Toss-up" : S.fav < 0.65 ? "Slight lean" : S.fav < 0.85 ? "Clear lean" : "Strong lean";
+  const op = S.model != null ? opinionText(S.mid, S.model) : null;
+  const mvTxt = (m) => m ? `${sgnMoney(m.usd)} (${m.x.toFixed(1)}× normal)` : "collecting...";
+  const x = S.m3 ? S.m3.x : S.m1 ? S.m1.x : null;
+  const mvAbs = S.moves == null ? null : Math.abs(S.moves);
+  return head + `<div class="verdict ${S.kind}${S.side === "under" ? " under" : ""}">${esc(S.title)}</div><p class="detail">${esc(S.detail)}</p>
+  <div class="rope" aria-hidden="true"><div class="track"></div><div class="mid"></div><div class="knot" style="left:${(S.mid * 100).toFixed(1)}%;background:${S.side === "over" ? "var(--up)" : "var(--down)"}"></div></div>
+  <div class="ends"><span class="u">Under (${short} down)</span><span class="o">Over (${short} up)</span></div>
+  <div class="leanline">${lean} toward <span class="${S.side === "over" ? "pos" : "neg"}">${S.side}</span>: market gives it ${Math.round(S.fav * 100)}% (over ${(S.ya * 100).toFixed(0)}¢, under ${(S.na * 100).toFixed(0)}¢)</div>
+  <div class="agrid">
+    <section><h4>Entry checklist for 1:00 left</h4><ul class="checks" style="margin:0">${S.checks.map((c) => `<li><span class="dot ${c.ok ? "ok" : "no"}"></span><span>${c.t}</span></li>`).join("")}</ul></section>
+    <section><h4>${coin} vs the target</h4><div class="val">${money(S.spot)}</div>
+      <div class="row"><span>Target price</span><span>${money(S.target)}</span></div>
+      <div class="row"><span>Distance</span><span class="${cls(S.spot - S.target)}">${S.spot && S.target ? sgnMoney(S.spot - S.target) + (S.spot >= S.target ? " above" : " below") : "--"}</span></div>
+      <div class="row"><span>Lead vs a normal swing</span><span>${mvAbs == null ? "--" : (mvAbs > 5 ? "over 5×" : mvAbs.toFixed(1) + "×") + (mvAbs >= 2 ? " (safe)" : mvAbs >= 1 ? " (solid)" : " (shaky)")}</span></div></section>
+    <section><h4>Bot's opinion vs Kalshi</h4><div class="val" style="font-size:17px">${op ? esc(op.txt) : "Waiting for data"}</div>
+      <div class="row"><span>Kalshi says (over)</span><span>${Math.round(S.mid * 100)}%</span></div>
+      <div class="row"><span>Bot says (over)</span><span>${S.model == null ? "--" : Math.round(S.model * 100) + "%"}</span></div>
+      <div class="row"><span>Difference</span><span>${op ? (op.d >= 0 ? "+" : "") + op.d.toFixed(0) + " points" : "--"}</span></div></section>
+    <section><h4>${coin} momentum</h4><div class="val ${cls(x)}">${x == null ? "Collecting..." : (x >= 0 ? "Rising, " : "Falling, ") + strength(x)}</div>
+      <div class="row"><span>Last 1 minute</span><span class="${cls(S.m1 && S.m1.usd)}">${mvTxt(S.m1)}</span></div>
+      <div class="row"><span>Last 3 minutes</span><span class="${cls(S.m3 && S.m3.usd)}">${mvTxt(S.m3)}</span></div>
+      <div class="row"><span>Market favorite, last 3 min</span><span class="${cls(S.trend)}">${S.trend == null ? "collecting..." : (S.trend >= 0 ? "rising +" : "falling ") + S.trend.toFixed(1) + "¢"}</span></div></section>
+  </div>`;
+}
+let alertsOn = false; const alerted = new Set();
+function beep() { try { const c = new (window.AudioContext || window.webkitAudioContext)(); const o = c.createOscillator(), g = c.createGain(); o.frequency.value = 880; o.connect(g); g.connect(c.destination); g.gain.setValueAtTime(0.15, c.currentTime); o.start(); o.stop(c.currentTime + 0.35); } catch (_) { } }
+$("alertBtn").onclick = async () => {
+  alertsOn = !alertsOn; $("alertBtn").textContent = alertsOn ? "Turn off alerts" : "Turn on alerts";
+  if (alertsOn && "Notification" in window && Notification.permission === "default") { try { await Notification.requestPermission(); } catch (_) { } }
+  $("alertNote").textContent = alertsOn ? "Beeps when a coin says Take. Keep this tab open." : ""; if (alertsOn) beep();
+};
+function renderAdvisor() {
+  for (const coin of ["Bitcoin", "Ethereum"]) {
+    $("adv" + coin).innerHTML = advisorHtml(coin);
+    const S = STATE[coin];
+    if (alertsOn && S && S.kind === "take" && !alerted.has(S.ticker)) {
+      alerted.add(S.ticker); beep();
+      if ("Notification" in window && Notification.permission === "granted") { try { new Notification(`${coin}: ${S.title}`); } catch (_) { } }
+    }
+  }
+}
+// ---------- strategy comparison ----------
+const STRAT_INFO = [
+  ["main", "Optimized: rising favorite, 1:00 left", "82% won, +4.6¢ (BTC) · 80%, +2.7¢ (ETH)"],
+  ["checklist_early", "Checklist green any time before 1:00", "lost about 1-2¢ per contract"],
+  ["tiktok", "TikTok: 80-97¢ side at 12:30 in", "lost money in every month"],
+  ["fav90_3min", "Favorite 90-97¢, 3:00 left", "about break-even, 3 of 11 months up"],
+  ["fav70_1min", "Favorite 70-85¢, 1:00 left", "small profit, 7 of 11 months up"],
+  ["longshot_2min", "Long shot 3-15¢, 2:00 left", "lost about 2¢ per contract"],
+  ["reversal_5m", "Fade a 15¢ move over 5 min", "lost about 5¢ per contract"],
+  ["btc_model", "Bot's price model vs Kalshi", "lost money (Kalshi already prices it in)"],
+];
+function renderCompare() {
+  const rows = STRAT_INFO.map(([key, label, tested]) => {
+    const list = key === "main" ? SIG.filter((s) => s.passed) : ST.filter((s) => s.strategy === key);
+    const cell = (coin) => {
+      const done = list.filter((s) => s.result && (!coin || s.coin === coin)); if (!done.length) return "--";
+      const w = done.filter((s) => s.result === s.side).length;
+      const avg = done.reduce((a, s) => a + ((s.result === s.side ? 1 - s.price : -s.price) - fee(+s.price)), 0) / done.length * 100;
+      return `${w}/${done.length} · <span class="${cls(avg)}">${cents(avg)}</span>`;
+    };
+    return `<tr${key === "main" ? ' style="font-weight:600"' : ""}><td class="l">${label}</td><td>${cell("Bitcoin")}</td><td>${cell("Ethereum")}</td><td>${cell(null)}</td><td class="l small muted">${tested}</td></tr>`;
+  });
+  $("compare").innerHTML = '<tr><th class="l">Strategy</th><th>Bitcoin (won · avg)</th><th>Ethereum</th><th>Both</th><th class="l">10½-month test</th></tr>' + rows.join("");
 }
 function renderResults() {
   const rows = [];
@@ -370,7 +497,7 @@ setInterval(() => {
   const n = nextDecision(), s = Math.max(0, Math.round((n - Date.now()) / 1000));
   $("sNext").textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
   $("sNextNote").textContent = `At ${n.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}, with 1:00 left in the current markets`;
-  if (A && session) for (const [coin, el] of [["Bitcoin", "mBTC"], ["Ethereum", "mETH"]]) $(el).innerHTML = marketCard(coin);
+  if (A && session) renderAdvisor();
 }, 1000);
 sb.auth.getSession().then(({ data }) => { if (!data.session) { $("authView").classList.remove("hidden"); } });
 </script>
