@@ -126,7 +126,7 @@ ol.steps li{margin:3px 0}
 
   <div class="card" style="margin-top:16px" id="advisor">
     <div class="adv-head">
-      <div><h2 style="margin-bottom:4px">Advisor</h2><p class="small muted">The live call for the markets running right now. Updates every few seconds. The bot trades Bitcoin and Ethereum on its own; Gold is paper only for now.</p></div>
+      <div><h2 style="margin-bottom:4px">Advisor</h2><p class="small muted">The live call for the markets running right now. Updates every few seconds. The bot trades Bitcoin and Ethereum on its own. Gold trades for real only if you tick Gold in Settings (Live mode).</p></div>
       <div><button type="button" class="ghost" id="alertBtn">Turn on alerts</button> <span class="small muted" id="alertNote"></span></div>
     </div>
     <div id="advBitcoin"></div>
@@ -137,8 +137,8 @@ ol.steps li{margin:3px 0}
   </div>
 
   <div class="card" id="goldCard">
-    <h2>Gold paper trades <span class="tag">paper only</span></h2>
-    <p class="small muted" style="margin:0 0 8px">Every gold trade the rule would have made. No money is spent.</p>
+    <h2>Gold rule signals <span class="tag" id="goldTag2">paper only</span></h2>
+    <p class="small muted" style="margin:0 0 8px">Every gold trade the rule picked (the rule's own record, 1 contract each). Your real gold orders, if any, show in Your trades below.</p>
     <div class="scroll" style="max-height:320px"><table id="goldTrades"></table></div>
   </div>
 
@@ -190,7 +190,9 @@ ol.steps li{margin:3px 0}
       <label>Markets</label>
       <label class="check"><input type="checkbox" id="cBTC"> Bitcoin</label>
       <label class="check"><input type="checkbox" id="cETH"> Ethereum</label>
+      <label class="check"><input type="checkbox" id="cGOLD"> Gold <span class="small muted">(newer rule: tested on ~3 months of data. Buys the 90-97¢ favorite at 7:00 left. Goes back to paper by itself if the rule lost money over the last 4 weeks.)</span></label>
       <label for="betPct">Bet size (% of crypto balance per trade)</label><input type="number" id="betPct" min="1" max="25" step="0.5">
+      <label for="goldPct">Gold bet size (% of crypto balance per gold trade)</label><input type="number" id="goldPct" min="1" max="25" step="0.5">
       <label for="maxBet">Largest single bet ($)</label><input type="number" id="maxBet" min="1" step="1">
       <label for="stopBelow">Pause live trading if balance falls below ($, 0 = off)</label><input type="number" id="stopBelow" min="0" step="1">
       <label for="dailyLoss">Daily loss limit ($)</label><input type="number" id="dailyLoss" min="1" step="1">
@@ -302,7 +304,8 @@ async function loadQuotes() {
 
 function fillSettings() {
   mode = A.mode; $("ack").checked = A.mode === "live";
-  $("cBTC").checked = A.trade_btc; $("cETH").checked = A.trade_eth;
+  $("cBTC").checked = A.trade_btc; $("cETH").checked = A.trade_eth; $("cGOLD").checked = !!A.trade_gold;
+  $("goldPct").value = +((A.gold_bet_pct ?? 0.05) * 100).toFixed(2);
   $("betPct").value = +(A.bet_pct * 100).toFixed(2); $("maxBet").value = +A.max_bet; $("stopBelow").value = +A.stop_below; $("dailyLoss").value = +A.max_daily_loss;
   paintMode();
 }
@@ -316,7 +319,9 @@ $("saveSet").onclick = async () => {
   if (mode === "live" && !$("ack").checked) { m.className = "msg neg"; m.textContent = "Tick the box to confirm you understand Live mode uses real money."; return; }
   const bet = Number($("betPct").value) / 100;
   if (!(bet >= 0.01 && bet <= 0.25)) { m.className = "msg neg"; m.textContent = "Bet size must be between 1% and 25%."; return; }
-  const patch = { mode, trade_btc: $("cBTC").checked, trade_eth: $("cETH").checked, bet_pct: bet,
+  const gbet = Number($("goldPct").value) / 100;
+  if (!(gbet >= 0.01 && gbet <= 0.25)) { m.className = "msg neg"; m.textContent = "Gold bet size must be between 1% and 25%."; return; }
+  const patch = { mode, trade_btc: $("cBTC").checked, trade_eth: $("cETH").checked, trade_gold: $("cGOLD").checked, gold_bet_pct: gbet, bet_pct: bet,
     max_bet: Math.max(1, Number($("maxBet").value) || 100), stop_below: Math.max(0, Number($("stopBelow").value) || 0), max_daily_loss: Math.max(1, Number($("dailyLoss").value) || 10) };
   m.textContent = "Saving...";
   const { error } = await sb.from("accounts").update(patch).eq("user_id", A.user_id);
@@ -358,7 +363,7 @@ function render() {
   $("banners").innerHTML = b.join("");
   // status
   $("sMode").innerHTML = A.mode === "live" ? '<span class="pos">Live</span>' : "Paper";
-  $("sModeNote").textContent = A.mode === "live" ? `Real orders, ${(A.bet_pct * 100).toFixed(1)}% per trade, max ${usd(+A.max_bet)}` : "Practice trades only, no money spent";
+  $("sModeNote").textContent = A.mode === "live" ? `Real orders, ${(A.bet_pct * 100).toFixed(1)}% per trade, max ${usd(+A.max_bet)}` + (A.trade_gold ? ` · Gold ${((A.gold_bet_pct ?? 0.05) * 100).toFixed(1)}%` : "") : "Practice trades only, no money spent";
   $("sBal").textContent = A.balance == null ? "--" : usd(+A.balance);
   $("sBalNote").textContent = A.balance == null ? (A.key_ok ? "Waiting for the first check" : "Connect your Kalshi key to see it") : `Crypto account ${usd(+A.shard_balance)} · checked ${tm(A.balance_at)}`;
   // key
@@ -467,8 +472,9 @@ function goldRecord() {
   for (const x of done) { const p = +x.price; bal += bal * 0.05 / (p + fee(p)) * (pc(x) / 100); peak = Math.max(peak, bal); dd = Math.max(dd, 1 - bal / peak); }
   return { G, done, w, tot, pc, bal, dd };
 }
+function goldLiveForMe() { return !!(A && A.trade_gold && A.mode === "live" && A.key_ok); }
 function goldHtml() {
-  const head = '<div class="coinhead"><h3>Gold</h3><span class="tag">paper only</span>';
+  const head = '<div class="coinhead"><h3>Gold</h3>' + (goldLiveForMe() ? '<span class="tag real">live for you</span>' : '<span class="tag">paper only</span>');
   const R = goldRecord();
   const record = `<section><h4>Record so far</h4><div class="val">${R.done.length ? `${R.w} of ${R.done.length} won` : "No results yet"}</div>
       <div class="row"><span>Win rate</span><span>${R.done.length ? (R.w / R.done.length * 100).toFixed(1) + "%" : "--"} <span class="muted">(target ~96%)</span></span></div>
@@ -493,9 +499,10 @@ function goldHtml() {
   const ok = checks.every((c) => c.ok);
   const dec = R.G.find((x) => x.ticker === last.ticker);
   let kind, title, detail;
-  if (dec) { kind = "take"; title = `Paper buy: ${dec.side === "yes" ? "UP" : "DOWN"} at ${(dec.price * 100).toFixed(0)}¢`; detail = "Result comes in when this market closes."; }
-  else if (left > 420) { kind = "ready"; title = (ok ? "Lining up - " : "Get ready - ") + `check at 7:00 left (in ${fmtLeft(left - 420)})`; detail = "If both checks are green at 7:00 left, it records a paper buy of the favorite."; }
-  else if (left >= 380) { kind = ok ? "take" : "skip"; title = ok ? `Paper buy ${side === "yes" ? "UP" : "DOWN"} now` : "Skip this market"; detail = ok ? "Both checks passed." : "Not both checks passed at 7:00 left."; }
+  const word = goldLiveForMe() ? "Buy" : "Paper buy";
+  if (dec) { kind = "take"; title = `${word}: ${dec.side === "yes" ? "UP" : "DOWN"} at ${(dec.price * 100).toFixed(0)}¢`; detail = "Result comes in when this market closes."; }
+  else if (left > 420) { kind = "ready"; title = (ok ? "Lining up - " : "Get ready - ") + `check at 7:00 left (in ${fmtLeft(left - 420)})`; detail = `If both checks are green at 7:00 left, it ${goldLiveForMe() ? "buys" : "records a paper buy of"} the favorite.`; }
+  else if (left >= 380) { kind = ok ? "take" : "skip"; title = ok ? `${word} ${side === "yes" ? "UP" : "DOWN"} now` : "Skip this market"; detail = ok ? "Both checks passed." : "Not both checks passed at 7:00 left."; }
   else { kind = "closed"; title = "No trade this market"; detail = `Next gold market starts in ${fmtLeft(left)}.`; }
   const lean = fav < 0.55 ? "Toss-up" : fav < 0.65 ? "Slight lean" : fav < 0.85 ? "Clear lean" : "Strong lean";
   return head + `<span class="small muted num">${fmtLeft(left)} left</span></div>
@@ -511,6 +518,7 @@ function goldHtml() {
 function renderGoldLive() { $("advGold").innerHTML = goldHtml(); }
 function renderGold() {
   renderGoldLive();
+  $("goldTag2").textContent = goldLiveForMe() ? "live for you" : "paper only"; $("goldTag2").className = goldLiveForMe() ? "tag real" : "tag";
   const R = goldRecord(); const rows = R.G.slice().reverse().slice(0, 60);
   $("goldTrades").innerHTML = rows.length ? '<tr><th class="l">Time</th><th>Bought</th><th>Price</th><th>Result</th><th>Profit</th></tr>' + rows.map((x) => `<tr><td class="l">${tm(x.decided_at)}</td><td>${x.side === "yes" ? "Up" : "Down"}</td><td class="num">${(x.price * 100).toFixed(1)}¢</td><td>${x.result ? (x.result === x.side ? '<span class="pos">Won</span>' : '<span class="neg">Lost</span>') : '<span class="muted">waiting</span>'}</td><td class="num ${x.result ? cls(R.pc(x)) : ""}">${x.result ? cents(R.pc(x)) : "--"}</td></tr>`).join("") : '<tr><td class="l muted">None yet. The first ones come in at the next 7:00-left check while gold is open.</td></tr>';
 }
@@ -542,7 +550,7 @@ function renderCompare() {
 }
 function renderResults() {
   const rows = [];
-  for (const coin of ["Bitcoin", "Ethereum", "All"]) {
+  for (const coin of ["Bitcoin", "Ethereum", "Gold", "All"]) {
     for (const live of [true, false]) {
       const ts = TR.filter((t) => t.live === live && (coin === "All" || t.coin === coin)); const done = ts.filter((t) => t.result);
       const wins = done.filter((t) => t.result === t.side).length; const pnl = done.reduce((a, t) => a + +t.pnl, 0);
