@@ -214,7 +214,7 @@ $("authForm").onsubmit = async (e) => {
       if (r.error) throw new Error(r.error);
     }
     const { error } = await sb.auth.signInWithPassword({ email, password });
-    if (error) throw new Error(error.message === "Invalid login credentials" ? "Wrong email or password." : error.message);
+    if (error) throw new Error(error.message === "Invalid login credentials" ? (signingUp ? "Account created, but signing in failed. Try Sign in." : "Wrong email or password. First time here? Click Create account above to make your login.") : error.message);
   } catch (err) { $("authMsg").className = "msg neg"; $("authMsg").textContent = err.message; }
   $("authBtn").disabled = false;
 };
