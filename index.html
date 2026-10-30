@@ -459,6 +459,7 @@ const STRAT_INFO = [
   ["longshot_2min", "Long shot 3-15¢, 2:00 left", "lost about 2¢ per contract"],
   ["reversal_5m", "Fade a 15¢ move over 5 min", "lost about 5¢ per contract"],
   ["btc_model", "Bot's price model vs Kalshi", "lost money (Kalshi already prices it in)"],
+  ["gold_fav7", "Gold: favorite 90-97¢ at 7:00 left, rising (paper)", "gold +2.6¢ (3 months); only +0.5¢ on BTC/ETH over a year"],
 ];
 function renderCompare() {
   const rows = STRAT_INFO.map(([key, label, tested]) => {
@@ -469,9 +470,9 @@ function renderCompare() {
       const avg = done.reduce((a, s) => a + ((s.result === s.side ? 1 - s.price : -s.price) - fee(+s.price)), 0) / done.length * 100;
       return `${w}/${done.length} · <span class="${cls(avg)}">${cents(avg)}</span>`;
     };
-    return `<tr${key === "main" ? ' style="font-weight:600"' : ""}><td class="l">${label}</td><td>${cell("Bitcoin")}</td><td>${cell("Ethereum")}</td><td>${cell(null)}</td><td class="l small muted">${tested}</td></tr>`;
+    return `<tr${key === "main" ? ' style="font-weight:600"' : ""}><td class="l">${label}</td><td>${cell("Bitcoin")}</td><td>${cell("Ethereum")}</td><td>${cell("Gold")}</td><td>${cell(null)}</td><td class="l small muted">${tested}</td></tr>`;
   });
-  $("compare").innerHTML = '<tr><th class="l">Strategy</th><th>Bitcoin (won · avg)</th><th>Ethereum</th><th>Both</th><th class="l">10½-month test</th></tr>' + rows.join("");
+  $("compare").innerHTML = '<tr><th class="l">Strategy</th><th>Bitcoin (won · avg)</th><th>Ethereum</th><th>Gold</th><th>All</th><th class="l">Past testing</th></tr>' + rows.join("");
 }
 function renderResults() {
   const rows = [];
