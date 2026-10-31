@@ -87,6 +87,7 @@ ol.steps{padding-left:20px;margin:6px 0;font-size:14px}
 .agrid .val{font-size:20px;font-weight:700;margin-bottom:4px;font-variant-numeric:tabular-nums}
 .sep{border:0;border-top:1px solid var(--line);margin:22px 0 0}
 ol.steps li{margin:3px 0}
+.betgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.betgrid label{margin-top:0}.betgrid input{width:100%;box-sizing:border-box}
 </style>
 </head>
 <body>
@@ -191,8 +192,8 @@ ol.steps li{margin:3px 0}
       <label class="check"><input type="checkbox" id="cBTC"> Bitcoin</label>
       <label class="check"><input type="checkbox" id="cETH"> Ethereum</label>
       <label class="check"><input type="checkbox" id="cGOLD"> Gold <span class="small muted">(newer rule: tested on ~3 months of data. Buys the 90-97¢ favorite at 7:00 left. Goes back to paper by itself if the rule lost money over the last 4 weeks.)</span></label>
-      <label for="betPct">Bet size (% of crypto balance per trade)</label><input type="number" id="betPct" min="1" max="25" step="0.5">
-      <label for="goldPct">Gold bet size (% of crypto balance per gold trade)</label><input type="number" id="goldPct" min="1" max="25" step="0.5">
+      <label>Bet size per trade (% of crypto balance, 1-25)</label>
+      <div class="betgrid"><div><label for="betPct" class="small">Bitcoin</label><input type="number" id="betPct" min="1" max="25" step="0.5"></div><div><label for="ethPct" class="small">Ethereum</label><input type="number" id="ethPct" min="1" max="25" step="0.5"></div><div><label for="goldPct" class="small">Gold</label><input type="number" id="goldPct" min="1" max="25" step="0.5"></div></div>
       <label for="maxBet">Largest single bet ($)</label><input type="number" id="maxBet" min="1" step="1">
       <label for="stopBelow">Pause live trading if balance falls below ($, 0 = off)</label><input type="number" id="stopBelow" min="0" step="1">
       <label for="dailyLoss">Daily loss limit ($)</label><input type="number" id="dailyLoss" min="1" step="1">
@@ -305,7 +306,7 @@ async function loadQuotes() {
 function fillSettings() {
   mode = A.mode; $("ack").checked = A.mode === "live";
   $("cBTC").checked = A.trade_btc; $("cETH").checked = A.trade_eth; $("cGOLD").checked = !!A.trade_gold;
-  $("goldPct").value = +((A.gold_bet_pct ?? 0.05) * 100).toFixed(2);
+  $("goldPct").value = +((A.gold_bet_pct ?? 0.05) * 100).toFixed(2); $("ethPct").value = +((A.eth_bet_pct ?? A.bet_pct) * 100).toFixed(2);
   $("betPct").value = +(A.bet_pct * 100).toFixed(2); $("maxBet").value = +A.max_bet; $("stopBelow").value = +A.stop_below; $("dailyLoss").value = +A.max_daily_loss;
   paintMode();
 }
@@ -318,10 +319,12 @@ $("saveSet").onclick = async () => {
   if (mode === "live" && !A.key_ok) { m.className = "msg neg"; m.textContent = "Connect a working Kalshi key before switching to Live."; return; }
   if (mode === "live" && !$("ack").checked) { m.className = "msg neg"; m.textContent = "Tick the box to confirm you understand Live mode uses real money."; return; }
   const bet = Number($("betPct").value) / 100;
-  if (!(bet >= 0.01 && bet <= 0.25)) { m.className = "msg neg"; m.textContent = "Bet size must be between 1% and 25%."; return; }
+  if (!(bet >= 0.01 && bet <= 0.25)) { m.className = "msg neg"; m.textContent = "Bitcoin bet size must be between 1% and 25%."; return; }
+  const ebet = Number($("ethPct").value) / 100;
+  if (!(ebet >= 0.01 && ebet <= 0.25)) { m.className = "msg neg"; m.textContent = "Ethereum bet size must be between 1% and 25%."; return; }
   const gbet = Number($("goldPct").value) / 100;
   if (!(gbet >= 0.01 && gbet <= 0.25)) { m.className = "msg neg"; m.textContent = "Gold bet size must be between 1% and 25%."; return; }
-  const patch = { mode, trade_btc: $("cBTC").checked, trade_eth: $("cETH").checked, trade_gold: $("cGOLD").checked, gold_bet_pct: gbet, bet_pct: bet,
+  const patch = { mode, trade_btc: $("cBTC").checked, trade_eth: $("cETH").checked, trade_gold: $("cGOLD").checked, gold_bet_pct: gbet, bet_pct: bet, eth_bet_pct: ebet,
     max_bet: Math.max(1, Number($("maxBet").value) || 100), stop_below: Math.max(0, Number($("stopBelow").value) || 0), max_daily_loss: Math.max(1, Number($("dailyLoss").value) || 10) };
   m.textContent = "Saving...";
   const { error } = await sb.from("accounts").update(patch).eq("user_id", A.user_id);
@@ -363,7 +366,7 @@ function render() {
   $("banners").innerHTML = b.join("");
   // status
   $("sMode").innerHTML = A.mode === "live" ? '<span class="pos">Live</span>' : "Paper";
-  $("sModeNote").textContent = A.mode === "live" ? `Real orders, ${(A.bet_pct * 100).toFixed(1)}% per trade, max ${usd(+A.max_bet)}` + (A.trade_gold ? ` · Gold ${((A.gold_bet_pct ?? 0.05) * 100).toFixed(1)}%` : "") : "Practice trades only, no money spent";
+  $("sModeNote").textContent = A.mode === "live" ? `Real orders: BTC ${(A.bet_pct * 100).toFixed(1)}%, ETH ${((A.eth_bet_pct ?? A.bet_pct) * 100).toFixed(1)}%` + (A.trade_gold ? `, Gold ${((A.gold_bet_pct ?? 0.05) * 100).toFixed(1)}%` : "") + ` per trade, max ${usd(+A.max_bet)}` : "Practice trades only, no money spent";
   $("sBal").textContent = A.balance == null ? "--" : usd(+A.balance);
   $("sBalNote").textContent = A.balance == null ? (A.key_ok ? "Waiting for the first check" : "Connect your Kalshi key to see it") : `Crypto account ${usd(+A.shard_balance)} · checked ${tm(A.balance_at)}`;
   // key
