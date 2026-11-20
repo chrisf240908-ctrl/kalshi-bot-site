@@ -94,7 +94,7 @@ ol.steps li{margin:3px 0}
 <main>
 <header>
   <h1>Kalshi 15-Minute Bot</h1>
-  <div class="who hidden" id="who"><span id="whoEmail"></span><button class="ghost" id="signOut" type="button">Sign out</button></div>
+  <div class="who hidden" id="who"><a href="strategies.html">Strategies</a><span id="whoEmail"></span><button class="ghost" id="signOut" type="button">Sign out</button></div>
 </header>
 
 <!-- ============ signed out ============ -->
@@ -151,7 +151,7 @@ ol.steps li{margin:3px 0}
 
   <div class="card">
     <h2>How every strategy is doing</h2>
-    <p class="small muted" style="margin:0 0 8px">Paper tests of other ways to trade these markets, run on the same live prices for comparison. Profit is per contract, after the fee. Only the optimized strategy trades for accounts.</p>
+    <p class="small muted" style="margin:0 0 8px">Paper tests of other ways to trade these markets, run on the same live prices for comparison. Every signal since the start; profit is per contract, after the fee. Only the optimized strategy trades for accounts. Charts, trends and details: <a href="strategies.html">Strategies page</a>.</p>
     <div class="scroll"><table id="compare"></table></div>
   </div>
 
@@ -236,7 +236,7 @@ const cls = (v) => v > 0 ? "pos" : v < 0 ? "neg" : "";
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const tm = (iso) => new Date(iso).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 const fee = (p) => 0.07 * p * (1 - p);
-let session = null, A = null, Q = [], SIG = [], TR = [], EV = [], ST = [], CS = {}, mode = "paper", timer = null, qtimer = null, lastQ = null;
+let session = null, A = null, Q = [], SIG = [], TR = [], EV = [], ST = [], SS = [], CS = {}, mode = "paper", timer = null, qtimer = null, lastQ = null;
 
 // ---------- auth ----------
 let signingUp = false;
@@ -276,18 +276,20 @@ sb.auth.onAuthStateChange((_ev, s) => {
 });
 
 // ---------- data ----------
-let firstSettings = true;
+let firstSettings = true, ssAt = 0;
 async function load(force) {
   if (!session) return;
-  const [a, s, t, e, st, cs] = await Promise.all([
+  const wantSS = force || Date.now() - ssAt > 60000;   // the all-time strategy totals change slowly: once a minute is plenty
+  const [a, s, t, e, st, cs, ss] = await Promise.all([
     sb.from("accounts").select("*").maybeSingle(),
     sb.from("signals").select("*").order("decided_at", { ascending: false }).limit(1000),
     sb.from("trades").select("*").order("created_at", { ascending: false }).limit(500),
     sb.from("events").select("ts,msg,user_id").order("ts", { ascending: false }).limit(40),
-    sb.from("strat_signals").select("strategy,coin,ticker,decided_at,side,price,result").eq("passed", true).order("decided_at", { ascending: false }).limit(5000),
+    sb.from("strat_signals").select("strategy,coin,ticker,decided_at,side,price,result").eq("passed", true).eq("strategy", "gold_fav7").order("decided_at", { ascending: false }).limit(1000),
     sb.from("coin_state").select("coin,sigma,updated_at"),
+    wantSS ? sb.rpc("strategy_stats", { p_days: null }) : null,
   ]);
-  A = a.data; SIG = s.data || []; TR = t.data || []; EV = e.data || []; ST = st.data || [];
+  A = a.data; SIG = s.data || []; TR = t.data || []; EV = e.data || []; ST = st.data || []; if (ss && !ss.error) { SS = ss.data || []; ssAt = Date.now(); }
   CS = {}; for (const r of cs.data || []) CS[r.coin] = +r.sigma;
   if (!A) { $("banners").innerHTML = '<div class="banner bad">This login has no bot account. Ask the person who invited you to check your invite.</div>'; return; }
   if (firstSettings || force) { fillSettings(); firstSettings = false; }
@@ -537,15 +539,18 @@ const STRAT_INFO = [
   ["reversal_5m", "Fade a 15¢ move over 5 min", "lost about 5¢ per contract"],
   ["btc_model", "Bot's price model vs Kalshi", "lost money (Kalshi already prices it in)"],
   ["gold_fav7", "Gold: favorite 90-97¢ at 7:00 left, rising (paper)", "gold +2.6¢ (3 months); only +0.5¢ on BTC/ETH over a year"],
+  ["fav93_98_7m", "Favorite 93-98¢, 7:00 left (paper, new)", "best pattern in 30 days of history, fading lately"],
+  ["model_blend_1m", "Price model + market price blend, 1:15 left (paper, new)", "new: model alone did worse than the market"],
+  ["copper_fav5m", "Copper: favorite 70-90¢, 5:00 left (paper, new)", "only market that beat fees in both halves of Oct 10-Nov 9"],
 ];
 function renderCompare() {
+  // Totals come from the database over every signal since the start (strategy_stats), not a capped download.
   const rows = STRAT_INFO.map(([key, label, tested]) => {
-    const list = key === "main" ? SIG.filter((s) => s.passed) : ST.filter((s) => s.strategy === key);
     const cell = (coin) => {
-      const done = list.filter((s) => s.result && (!coin || s.coin === coin)); if (!done.length) return "--";
-      const w = done.filter((s) => s.result === s.side).length;
-      const avg = done.reduce((a, s) => a + ((s.result === s.side ? 1 - s.price : -s.price) - fee(+s.price)), 0) / done.length * 100;
-      return `${w}/${done.length} · <span class="${cls(avg)}">${cents(avg)}</span>`;
+      const r = SS.find((x) => x.strategy === key && x.coin === (coin || "All"));
+      if (!r || !+r.settled) return "--";
+      const avg = +r.avg_c;
+      return `${r.wins}/${r.settled} · <span class="${cls(avg)}">${cents(avg)}</span>`;
     };
     return `<tr${key === "main" ? ' style="font-weight:600"' : ""}><td class="l">${label}</td><td>${cell("Bitcoin")}</td><td>${cell("Ethereum")}</td><td>${cell("Gold")}</td><td>${cell(null)}</td><td class="l small muted">${tested}</td></tr>`;
   });
