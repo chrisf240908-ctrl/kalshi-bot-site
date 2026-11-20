@@ -1,0 +1,454 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Strategy details · Kalshi 15-Minute Bot</title>
+<meta name="description" content="Paper-trading results for every strategy the Kalshi 15-minute bot tests.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f5f6f4;--surface:#ffffff;--line:#e2e4df;--ink:#16191d;--muted:#5f6670;--up:#0f8a5f;--down:#c23b3b;--amber:#a86a00;--accent:#1f5fbf;--accent-ink:#fff;--soft:#eef1ec;
+ --grid:#ecede9;--axis:#c3c2b7;--s1:#2a78d6;--s2:#eb6834;--s3:#1baf7a;--s4:#eda100;--div-pos:#2a78d6;--div-neg:#e34948;
+ --sans:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"JetBrains Mono",ui-monospace,Consolas,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1214;--surface:#171b1f;--line:#2a3036;--ink:#e8eaed;--muted:#9aa3ad;--up:#34c08b;--down:#ef6b6b;--amber:#e0a63a;--accent:#5b95e8;--accent-ink:#0b0e11;--soft:#1d2227;
+ --grid:#22282d;--axis:#3a4148;--s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--div-pos:#3987e5;--div-neg:#e66767}}
+:root[data-theme="dark"]{--bg:#0f1214;--surface:#171b1f;--line:#2a3036;--ink:#e8eaed;--muted:#9aa3ad;--up:#34c08b;--down:#ef6b6b;--amber:#e0a63a;--accent:#5b95e8;--accent-ink:#0b0e11;--soft:#1d2227;
+ --grid:#22282d;--axis:#3a4148;--s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--div-pos:#3987e5;--div-neg:#e66767}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 var(--sans)}
+main{max-width:1080px;margin:0 auto;padding:20px 16px 40px}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+header h1{font-size:20px;margin:0;font-weight:700}
+header nav{display:flex;gap:14px;align-items:center;font-size:14px;color:var(--muted)}
+h2{font-size:16px;margin:0 0 4px}
+h3{font-size:14px;margin:0 0 8px;color:var(--muted);font-weight:600}
+a{color:var(--accent)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:16px 18px;margin-bottom:16px}
+.muted{color:var(--muted)}.pos{color:var(--up)}.neg{color:var(--down)}.amb{color:var(--amber)}
+.small{font-size:13px}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.hidden{display:none!important}
+.banner{border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:14px;border:1px solid var(--line);background:var(--surface)}
+.banner b{font-weight:700}
+.tag{font-size:11px;font-weight:700;padding:1px 6px;border-radius:4px;background:var(--soft);color:var(--muted);vertical-align:middle}
+button,.btnlink{font:600 14px var(--sans);border-radius:6px;border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink);padding:8px 14px;cursor:pointer;text-decoration:none;display:inline-block}
+.filters{display:flex;gap:18px;flex-wrap:wrap;align-items:center;margin:0 0 16px}
+.filters .lab{font-size:12px;font-weight:600;color:var(--muted);margin-right:6px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--surface)}
+.seg button{border:0;border-radius:0;background:transparent;color:var(--ink);font-weight:600;padding:6px 12px}
+.seg button.on{background:var(--accent);color:var(--accent-ink)}
+.seg button:focus-visible,.linkbtn:focus-visible,.plot:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.tiles{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));margin-bottom:16px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px 16px}
+.tile .k{font-size:13px;color:var(--muted);font-weight:600}
+.tile .v{font-size:28px;font-weight:700;line-height:1.2;margin:2px 0}
+.tile .d{font-size:13px;color:var(--muted)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:7px 8px;border-top:1px solid var(--line);text-align:right;white-space:nowrap}
+th{font-size:12px;color:var(--muted);font-weight:600;border-top:0}
+th.l,td.l{text-align:left}
+th.sort{cursor:pointer;user-select:none}
+th.sort:hover{color:var(--ink)}
+.scroll{overflow-x:auto}
+.linkbtn{all:unset;cursor:pointer;color:var(--accent);font-weight:600}
+.linkbtn:hover{text-decoration:underline}
+.rule{display:block;font-size:12px;color:var(--muted);white-space:normal;max-width:300px}
+tr.focus td{background:color-mix(in srgb,var(--accent) 7%,transparent)}
+tr.mainrow td:first-child+td .linkbtn{font-weight:700}
+.pick{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+.pick input{margin:0}
+.sw{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--line)}
+.verdict{font-weight:600}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;margin:6px 0 4px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.chartbox{position:relative;width:100%}
+.plot{display:block;width:100%;height:auto;touch-action:pan-y}
+.tip{position:absolute;pointer-events:none;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:8px 10px;font-size:13px;box-shadow:0 4px 14px rgba(0,0,0,.12);min-width:160px;z-index:2}
+.tip .t{color:var(--muted);font-size:12px;margin-bottom:4px}
+.tip .r{display:flex;align-items:center;gap:8px;padding:1px 0}
+.tip .r b{font-variant-numeric:tabular-nums;min-width:64px}
+.grid2{display:grid;gap:16px 24px;grid-template-columns:repeat(auto-fit,minmax(330px,1fr))}
+.bar{position:relative;height:10px;width:64px;display:inline-block;vertical-align:middle;margin-left:8px}
+.bar .z{position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:var(--axis)}
+.bar .f{position:absolute;top:0;bottom:0;border-radius:2px}
+.note{font-size:13px;color:var(--muted);margin:10px 0 0}
+.fineprint{font-size:13px;color:var(--muted)}
+.fineprint li{margin:4px 0}
+footer{margin-top:24px;font-size:13px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap}
+footer a{color:var(--muted)}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <h1>Strategy details <span class="tag">paper</span></h1>
+  <nav><a href="strategies.html">&larr; Results</a><a href="./">Bot</a><span id="whoEmail"></span><span id="updated" class="small"></span></nav>
+</header>
+
+<section id="signedOut" class="card hidden">
+  <h2>Sign in first</h2>
+  <p class="muted" style="margin:6px 0 12px">This page uses your bot login. Sign in on the bot page, then come back.</p>
+  <a class="btnlink" href="./">Go to sign in</a>
+</section>
+
+<section id="app" class="hidden">
+  <div class="banner"><b>Everything here is paper trading.</b> Each signal counts as buying 1 contract at the price the rule saw, minus Kalshi's fee
+    (7% &times; price &times; (1 &minus; price)). No real money is involved. With a dozen strategies tested at once, one can look good by luck,
+    so "Ahead so far" means "worth watching", not "proven".</div>
+
+  <div class="filters" role="group" aria-label="Filters">
+    <div><span class="lab">Period</span><span class="seg" id="fPeriod">
+      <button type="button" data-v="1">24 h</button><button type="button" data-v="7">7 days</button><button type="button" data-v="30">30 days</button><button type="button" data-v="">All</button></span></div>
+    <div><span class="lab">Market</span><span class="seg" id="fCoin">
+      <button type="button" data-v="">All</button><button type="button" data-v="Bitcoin">Bitcoin</button><button type="button" data-v="Ethereum">Ethereum</button><button type="button" data-v="Gold">Gold</button><button type="button" data-v="Copper">Copper</button></span></div>
+  </div>
+
+  <div class="tiles" id="tiles"></div>
+
+  <div class="card">
+    <h2>Strategy results</h2>
+    <p class="small muted" style="margin:0 0 8px">Click a column to sort, a name for details, and tick up to 4 boxes to compare them on the chart below.
+      The 95% range is where the true average probably lies; if it includes 0, the result could still be luck.</p>
+    <div class="scroll"><table id="board"></table></div>
+    <p class="note" id="boardNote"></p>
+  </div>
+
+  <div class="card">
+    <h2>Profit over time</h2>
+    <p class="small muted" style="margin:0">Running total if the strategy had bought 1 contract on every signal (dollars, after fees). Hover or use the arrow keys for daily values.</p>
+    <div class="legend" id="legend"></div>
+    <div class="chartbox" id="chartbox"><svg class="plot" id="plot" tabindex="0" role="img" aria-label="Running paper profit per strategy"></svg><div class="tip hidden" id="tip"></div></div>
+    <p class="note" id="chartNote"></p>
+  </div>
+
+  <div class="card" id="detail">
+    <h2 id="dTitle">Details</h2>
+    <p class="small muted" style="margin:0 0 12px" id="dRule">Click a strategy name above to see where it makes and loses money.</p>
+    <div id="dBody"></div>
+  </div>
+
+  <div class="card">
+    <h2>How to read this</h2>
+    <ul class="fineprint">
+      <li><b>Avg per contract</b>: average profit or loss per contract, in cents, after the fee. Over many trades this is what matters, not the win rate: a strategy that wins 93% of the time at 95&cent; can still lose money.</li>
+      <li><b>95% range</b>: the average plus or minus about two standard errors. Fewer than 30 settled trades is too few to judge.</li>
+      <li><b>Losing</b>: the whole range is below zero. <b>Ahead so far</b>: the whole range is above zero. <b>Can't tell yet</b>: the range includes zero; the estimate of trades still needed assumes the average stays where it is.</li>
+      <li>"Bot's own rule" is the rule the bot uses for accounts in Live mode. Real-money trading is currently switched off for the whole bot.</li>
+      <li>Results come from the markets' official Kalshi outcomes, checked every 5 minutes. Days are Pacific time.</li>
+    </ul>
+  </div>
+</section>
+
+<footer><a href="./">Bot</a><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a></footer>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+const SB_URL = "https://nyomnongkxpoqyqgztwk.supabase.co";
+const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im55b21ub25na3hwb3F5cWd6dHdrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMyOTUyNjAsImV4cCI6MjEwODg3MTI2MH0.RrfQ1bv1eevgj1drCPfmPbPh5OmPVyVhGdq6VPLxQjM";
+const sb = supabase.createClient(SB_URL, SB_KEY);
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const cents = (v) => v == null || !isFinite(v) ? "--" : (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v).toFixed(1) + "¢";
+const dollars = (v) => v == null || !isFinite(v) ? "--" : (v > 0 ? "+" : v < 0 ? "−" : "") + "$" + Math.abs(v).toFixed(2);
+const int = (v) => Number(v).toLocaleString();
+const cls = (v) => v > 0 ? "pos" : v < 0 ? "neg" : "";
+const tm = (iso) => new Date(iso).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+
+// What each strategy does (rules exactly as coded in the bot's engine).
+const INFO = {
+  main:            { name: "Bot's own rule",         rule: "Rising favorite at 65-85¢, gap 5¢ or less, with 1:00 left (Bitcoin, Ethereum)" },
+  gold_fav7:       { name: "Gold favorite, 7:00 left", rule: "Gold: favorite at 90-97¢ and rising over 2 min, with 7:00 left" },
+  fav93_98_7m:     { name: "Favorite 93-98¢, 7:00 left", rule: "Buys the 93-98¢ side with about 7 minutes left" },
+  fav90_3min:      { name: "Favorite 90-97¢, 3:00 left", rule: "Buys the 90-97¢ side with about 3 minutes left" },
+  tiktok:          { name: "TikTok rule",            rule: "Buys the 80-97¢ side about 12:30 into the market" },
+  fav70_1min:      { name: "Favorite 70-85¢, 1:00 left", rule: "Buys the 70-85¢ side with about 1 minute left" },
+  checklist_early: { name: "Checklist, any time",    rule: "The bot's checklist turning green at any moment with more than 1:00 left" },
+  longshot_2min:   { name: "Long shot 3-15¢",        rule: "Buys the 3-15¢ side with about 2 minutes left" },
+  reversal_5m:     { name: "Fade a 15¢ move",        rule: "Bets against a 15¢+ move over the last 5 minutes (mid-priced markets)" },
+  btc_model:       { name: "Price model",            rule: "The bot's own spot-price model vs Kalshi's price, 5¢ edge after fees" },
+  model_blend_1m:  { name: "Model + market blend",   rule: "Averages Kalshi's price with the model; bets when 3¢+ better after fees, 1:15 left" },
+  copper_fav5m:    { name: "Copper favorite, 5:00 left", rule: "Copper: 70-90¢ favorite, gap 5¢ or less, with 5:00 left" },
+};
+const nameOf = (k) => (INFO[k] || {}).name || k;
+const ruleOf = (k) => (INFO[k] || {}).rule || "";
+
+const S = { days: 30, coin: "", stats: [], daily: [], sort: { key: "avg", dir: -1 }, sel: new Map(), picked: false, focus: null, idx: null, loading: false };
+const SLOTS = 4;
+
+// ---------- data ----------
+async function rpcAll(fn, args) {
+  const out = [];
+  for (let from = 0; ; from += 1000) {                      // the API returns at most 1,000 rows per request
+    const { data, error } = await sb.rpc(fn, args).range(from, from + 999);
+    if (error) throw error;
+    out.push(...data);
+    if (data.length < 1000) return out;
+  }
+}
+async function load() {
+  if (S.loading) return;
+  S.loading = true;
+  try {
+    const days = S.days || null, coin = S.coin || null;
+    const [stats, daily] = await Promise.all([rpcAll("strategy_stats", { p_days: days }), rpcAll("strategy_daily", { p_days: days, p_coin: coin })]);
+    S.stats = stats; S.daily = daily;
+    if (!S.picked) pickDefaults();
+    renderTiles(); renderBoard(); renderChart();
+    if (S.focus) loadDetail();
+    $("updated").textContent = "Updated " + new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  } catch (e) {
+    $("updated").textContent = "Couldn't load: " + (e.message || e);
+  } finally { S.loading = false; }
+}
+function rowsForCoin() {
+  const want = S.coin || "All";
+  return S.stats.filter((r) => r.coin === want).map((r) => ({ ...r, settled: +r.settled, wins: +r.wins, open: +r.open,
+    avg: r.avg_c == null ? null : +r.avg_c, sd: r.sd_c == null ? null : +r.sd_c, sum: r.sum_c == null ? 0 : +r.sum_c, v: verdict(+r.settled, +r.avg_c, +r.sd_c) }));
+}
+
+// ---------- verdicts ----------
+function verdict(n, m, s) {
+  if (!n) return { k: "none", t: "No results yet", rank: 0 };
+  if (n < 30) return { k: "few", t: `Too few trades (${n} of 30)`, rank: 0 };
+  const se = (s || 0) / Math.sqrt(n), lo = m - 1.96 * se, hi = m + 1.96 * se;
+  if (hi < 0) return { k: "lose", t: "Losing", lo, hi, rank: 1 };
+  if (lo > 0) return { k: "ahead", t: "Ahead so far", lo, hi, rank: 3 };
+  const need = m ? Math.ceil((1.96 * s / Math.abs(m)) ** 2) - n : Infinity;
+  return { k: "unclear", t: "Can't tell yet", need: isFinite(need) && need > 0 && need < 1e6 ? need : null, lo, hi, rank: 2 };
+}
+function verdictHtml(v) {
+  if (v.k === "lose") return '<span class="verdict neg">▼ Losing</span>';
+  if (v.k === "ahead") return '<span class="verdict pos">▲ Ahead so far</span>';
+  if (v.k === "unclear") return `<span class="verdict amb">? Can't tell yet</span>${v.need ? `<span class="small muted"> · ~${int(v.need)} more</span>` : ""}`;
+  return `<span class="muted">… ${esc(v.t)}</span>`;
+}
+
+// ---------- tiles ----------
+function renderTiles() {
+  const R = rowsForCoin();
+  const settled = R.reduce((a, r) => a + r.settled, 0), losing = R.filter((r) => r.v.k === "lose").length,
+    ahead = R.filter((r) => r.v.k === "ahead").length, judged = R.filter((r) => r.settled >= 30).length;
+  const m = R.find((r) => r.strategy === "main");
+  const first = R.map((r) => r.first_at).filter(Boolean).sort()[0];
+  const period = S.days ? (S.days === 1 ? "last 24 hours" : `last ${S.days} days`) : first ? "since " + new Date(first).toLocaleDateString([], { month: "short", day: "numeric" }) : "all time";
+  $("tiles").innerHTML = [
+    tile("Settled paper signals", int(settled), `${period}${S.coin ? ", " + esc(S.coin) : ""}`),
+    tile("Clearly losing", `${losing} <span class="small muted">of ${judged}</span>`, "strategies with 30+ trades and the whole range below 0"),
+    tile("Clearly ahead", `${ahead} <span class="small muted">of ${judged}</span>`, "whole range above 0 (could still be luck)"),
+    tile("Bot's own rule", m ? `<span class="${cls(m.avg)}">${cents(m.avg)}</span>` : "--", m ? `per contract over ${int(m.settled)} trades · ${m.v.t}` : "no signals in this view"),
+  ].join("");
+}
+const tile = (k, v, d) => `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="d">${d}</div></div>`;
+
+// ---------- leaderboard (also the chart's table view) ----------
+const COLS = [
+  { key: "pick", label: "Chart", l: true },
+  { key: "name", label: "Strategy", l: true, sort: (r) => nameOf(r.strategy) },
+  { key: "n", label: "Trades", sort: (r) => r.settled },
+  { key: "won", label: "Won", sort: (r) => r.settled ? r.wins / r.settled : -1 },
+  { key: "avg", label: "Avg per contract", sort: (r) => r.avg ?? -1e9 },
+  { key: "range", label: "95% range", sort: (r) => r.v.lo ?? -1e9 },
+  { key: "sum", label: "Total, 1 contract each", sort: (r) => r.sum },
+  { key: "verdict", label: "Verdict", l: true, sort: (r) => r.v.rank * 1e6 + (r.avg ?? 0) },
+];
+function renderBoard() {
+  const R = rowsForCoin(), c = COLS.find((x) => x.key === S.sort.key);
+  const byResult = ["won", "avg", "range", "sum", "verdict"].includes(S.sort.key);   // under 30 trades: listed last, never "top"
+  R.sort((a, b) => (byResult && (a.settled < 30) !== (b.settled < 30) ? (a.settled < 30 ? 1 : -1) : 0)
+    || (c.sort(a) < c.sort(b) ? -1 : c.sort(a) > c.sort(b) ? 1 : 0) * S.sort.dir);
+  const head = "<tr>" + COLS.map((x) => `<th class="${x.l ? "l " : ""}${x.sort ? "sort" : ""}" ${x.sort ? `data-k="${x.key}" tabindex="0" aria-sort="${S.sort.key === x.key ? (S.sort.dir > 0 ? "ascending" : "descending") : "none"}"` : ""}>${x.label}${S.sort.key === x.key ? (S.sort.dir > 0 ? " ▲" : " ▼") : ""}</th>`).join("") + "</tr>";
+  const body = R.map((r) => {
+    const slot = S.sel.get(r.strategy);
+    return `<tr class="${r.strategy === S.focus ? "focus " : ""}${r.strategy === "main" ? "mainrow" : ""}">
+      <td class="l"><label class="pick"><input type="checkbox" data-pick="${esc(r.strategy)}" ${slot ? "checked" : ""} aria-label="Show ${esc(nameOf(r.strategy))} on chart"><span class="sw" style="${slot ? `background:var(--s${slot})` : ""}"></span></label></td>
+      <td class="l"><button type="button" class="linkbtn" data-focus="${esc(r.strategy)}">${esc(nameOf(r.strategy))}</button><span class="rule">${esc(ruleOf(r.strategy))}</span></td>
+      <td class="num">${int(r.settled)}${r.open ? `<span class="small muted"> +${r.open} open</span>` : ""}</td>
+      <td class="num">${r.settled ? (r.wins / r.settled * 100).toFixed(0) + "%" : "--"}</td>
+      <td class="num ${cls(r.avg)}">${cents(r.avg)}</td>
+      <td class="num small">${r.v.lo == null ? '<span class="muted">--</span>' : `${cents(r.v.lo)} to ${cents(r.v.hi)}`}</td>
+      <td class="num ${cls(r.sum)}">${r.settled ? dollars(r.sum / 100) : "--"}</td>
+      <td class="l">${verdictHtml(r.v)}</td></tr>`;
+  }).join("");
+  $("board").innerHTML = head + (body || `<tr><td class="l muted" colspan="8">No signals in this view yet.</td></tr>`);
+  $("boardNote").textContent = R.length ? `${R.length} strategies. Profit per contract after Kalshi's fee; a 1-contract total of −$5.00 means 500¢ lost over all its trades.` : "";
+}
+$("board").addEventListener("click", (e) => {
+  const th = e.target.closest("th[data-k]"); if (th) return sortBy(th.dataset.k);
+  const f = e.target.closest("[data-focus]"); if (f) { S.focus = f.dataset.focus; renderBoard(); loadDetail(); $("detail").scrollIntoView({ behavior: "smooth", block: "start" }); }
+});
+$("board").addEventListener("keydown", (e) => { const th = e.target.closest("th[data-k]"); if (th && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); sortBy(th.dataset.k); } });
+$("board").addEventListener("change", (e) => {
+  const k = e.target.dataset.pick; if (!k) return;
+  if (e.target.checked) {
+    if (S.sel.size >= SLOTS) { e.target.checked = false; $("chartNote").textContent = `Up to ${SLOTS} strategies at a time: untick one first.`; return; }
+    const used = new Set(S.sel.values()); let slot = 1; while (used.has(slot)) slot++;
+    S.sel.set(k, slot);                                      // a strategy keeps its color until it is unticked
+  } else S.sel.delete(k);
+  S.picked = true; renderBoard(); renderChart();
+});
+function sortBy(k) { S.sort = { key: k, dir: S.sort.key === k ? -S.sort.dir : (k === "name" ? 1 : -1) }; renderBoard(); }
+function pickDefaults() {
+  const R = rowsForCoin().filter((r) => r.settled > 0).sort((a, b) => b.settled - a.settled);
+  const keys = [];
+  if (R.some((r) => r.strategy === "main")) keys.push("main");
+  for (const r of R) if (keys.length < 3 && !keys.includes(r.strategy)) keys.push(r.strategy);
+  keys.forEach((k, i) => S.sel.set(k, i + 1));
+  S.picked = keys.length > 0;
+}
+
+// ---------- chart: running paper profit ----------
+const NS = "http://www.w3.org/2000/svg";
+function el(tag, attrs, parent) { const n = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v); if (parent) parent.appendChild(n); return n; }
+function niceTicks(lo, hi, n = 5) {
+  const span = hi - lo || 1, step0 = span / n, mag = 10 ** Math.floor(Math.log10(step0)), err = step0 / mag;
+  const step = (err >= 7.5 ? 10 : err >= 3.5 ? 5 : err >= 1.5 ? 2 : 1) * mag;
+  const a = Math.floor(lo / step) * step, b = Math.ceil(hi / step) * step, out = [];
+  for (let v = a; v <= b + step / 2; v += step) out.push(+v.toFixed(10));
+  return out;
+}
+let CH = null;
+function renderChart() {
+  const svg = $("plot"); svg.replaceChildren(); $("tip").classList.add("hidden");
+  const days = [...new Set(S.daily.map((d) => d.day))].sort();
+  const keys = [...S.sel.keys()];
+  $("legend").innerHTML = keys.map((k) => `<span><i class="sw" style="background:var(--s${S.sel.get(k)})"></i>${esc(nameOf(k))}</span>`).join("");
+  if (!keys.length || days.length < 2) {
+    CH = null; svg.setAttribute("viewBox", "0 0 600 60"); svg.style.height = "60px";
+    $("chartNote").textContent = !keys.length ? "Tick a strategy in the table to draw it." : "Pick 7 days or longer to see a trend; this view has fewer than 2 days.";
+    return;
+  }
+  svg.style.height = "";
+  $("chartNote").textContent = S.coin ? `${S.coin} signals only.` : "";
+  const series = keys.map((k) => {
+    const by = new Map(S.daily.filter((d) => d.strategy === k).map((d) => [d.day, +d.sum_c / 100]));
+    let run = 0; const ys = days.map((d) => (run += by.get(d) || 0));
+    return { k, slot: S.sel.get(k), ys, n: S.daily.filter((d) => d.strategy === k).reduce((a, d) => a + +d.n, 0) };
+  });
+  const W = Math.max(320, $("chartbox").clientWidth), H = W < 520 ? 240 : 300;
+  const m = { l: 52, r: W < 520 ? 92 : 170, t: 12, b: 28 };
+  const all = series.flatMap((s) => s.ys), ticks = niceTicks(Math.min(0, ...all), Math.max(0, ...all));
+  const y0 = ticks[0], y1 = ticks[ticks.length - 1];
+  const X = (i) => m.l + (W - m.l - m.r) * (days.length === 1 ? 0.5 : i / (days.length - 1));
+  const Y = (v) => m.t + (H - m.t - m.b) * (1 - (v - y0) / (y1 - y0 || 1));
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  const g = el("g", {}, svg);
+  for (const t of ticks) {
+    el("line", { x1: m.l, x2: W - m.r, y1: Y(t), y2: Y(t), stroke: t === 0 ? "var(--axis)" : "var(--grid)", "stroke-width": 1 }, g);
+    const lab = el("text", { x: m.l - 8, y: Y(t) + 4, "text-anchor": "end", "font-size": 11, fill: "var(--muted)" }, g);
+    lab.textContent = (t < 0 ? "−$" : "$") + Math.abs(t).toFixed(Math.abs(y1 - y0) < 5 ? 2 : 0);
+  }
+  const fmtDay = (d) => new Date(d + "T12:00:00").toLocaleDateString([], { month: "short", day: "numeric" });
+  const step = Math.max(1, Math.ceil(days.length / Math.max(2, Math.floor((W - m.l - m.r) / 80))));
+  days.forEach((d, i) => { if (i % step === 0 || i === days.length - 1) { const t = el("text", { x: X(i), y: H - 8, "text-anchor": "middle", "font-size": 11, fill: "var(--muted)" }, g); t.textContent = fmtDay(d); } });
+  for (const s of series) {
+    el("path", { d: s.ys.map((v, i) => (i ? "L" : "M") + X(i).toFixed(1) + " " + Y(v).toFixed(1)).join(""), fill: "none", stroke: `var(--s${s.slot})`, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }, g);
+  }
+  // direct labels at line ends, pushed apart so they never overlap
+  const ends = series.map((s) => ({ s, y: Y(s.ys[s.ys.length - 1]) })).sort((a, b) => a.y - b.y);
+  for (let i = 1; i < ends.length; i++) if (ends[i].y - ends[i - 1].y < 16) ends[i].y = ends[i - 1].y + 16;
+  const xe = X(days.length - 1);
+  for (const e of ends) {
+    el("circle", { cx: xe, cy: Y(e.s.ys[e.s.ys.length - 1]), r: 4, fill: `var(--s${e.s.slot})`, stroke: "var(--surface)", "stroke-width": 2 }, g);
+    const t = el("text", { x: xe + 10, y: e.y + 4, "font-size": 12, fill: "var(--ink)" }, g);
+    const short = nameOf(e.s.k), cap = W < 520 ? 10 : 22; t.textContent = short.length > cap ? short.slice(0, cap - 1) + "…" : short;
+    const v = el("text", { x: xe + 10, y: e.y + 17, "font-size": 11, fill: "var(--muted)" }, g); v.textContent = dollars(e.s.ys[e.s.ys.length - 1]);
+    if (ends.length > 1) { /* keep second line only when there is room */ if (ends.some((o) => o !== e && Math.abs(o.y - e.y) < 30)) v.remove(); }
+  }
+  const cross = el("line", { x1: 0, x2: 0, y1: m.t, y2: H - m.b, stroke: "var(--muted)", "stroke-width": 1, visibility: "hidden" }, g);
+  const dots = series.map((s) => el("circle", { r: 4, fill: `var(--s${s.slot})`, stroke: "var(--surface)", "stroke-width": 2, visibility: "hidden" }, g));
+  el("rect", { x: m.l, y: m.t, width: W - m.l - m.r, height: H - m.t - m.b, fill: "transparent" }, g);
+  CH = { W, H, m, X, Y, days, series, cross, dots, fmtDay };
+}
+function showAt(i) {
+  if (!CH) return;
+  i = Math.max(0, Math.min(CH.days.length - 1, i)); S.idx = i;
+  const x = CH.X(i);
+  CH.cross.setAttribute("x1", x); CH.cross.setAttribute("x2", x); CH.cross.setAttribute("visibility", "visible");
+  CH.series.forEach((s, j) => { CH.dots[j].setAttribute("cx", x); CH.dots[j].setAttribute("cy", CH.Y(s.ys[i])); CH.dots[j].setAttribute("visibility", "visible"); });
+  const tip = $("tip"); tip.replaceChildren();
+  const head = document.createElement("div"); head.className = "t"; head.textContent = "Through " + CH.fmtDay(CH.days[i]); tip.appendChild(head);
+  for (const s of [...CH.series].sort((a, b) => b.ys[i] - a.ys[i])) {
+    const r = document.createElement("div"); r.className = "r";
+    const sw = document.createElement("i"); sw.className = "sw"; sw.style.background = `var(--s${s.slot})`;
+    const b = document.createElement("b"); b.textContent = dollars(s.ys[i]);
+    const n = document.createElement("span"); n.textContent = nameOf(s.k);
+    r.append(sw, b, n); tip.appendChild(r);
+  }
+  tip.classList.remove("hidden");
+  const box = $("chartbox").getBoundingClientRect(), scale = box.width / CH.W, px = x * scale;
+  tip.style.left = Math.min(box.width - tip.offsetWidth - 4, Math.max(4, px + 14 > box.width - tip.offsetWidth ? px - tip.offsetWidth - 14 : px + 14)) + "px";
+  tip.style.top = (CH.m.t * scale + 4) + "px";
+}
+function hideTip() { if (!CH) return; $("tip").classList.add("hidden"); CH.cross.setAttribute("visibility", "hidden"); CH.dots.forEach((d) => d.setAttribute("visibility", "hidden")); }
+$("plot").addEventListener("pointermove", (e) => {
+  if (!CH) return; const r = $("plot").getBoundingClientRect(), x = (e.clientX - r.left) * CH.W / r.width;
+  if (x < CH.m.l - 20 || x > CH.W - CH.m.r + 20) return hideTip();
+  showAt(Math.round((x - CH.m.l) / ((CH.W - CH.m.l - CH.m.r) / Math.max(1, CH.days.length - 1))));
+});
+$("plot").addEventListener("pointerleave", hideTip);
+$("plot").addEventListener("blur", hideTip);
+$("plot").addEventListener("keydown", (e) => {
+  if (!CH) return;
+  if (e.key === "ArrowRight" || e.key === "ArrowLeft") { e.preventDefault(); showAt((S.idx ?? CH.days.length - 1) + (e.key === "ArrowRight" ? 1 : -1)); }
+  if (e.key === "Escape") hideTip();
+});
+let rz; window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(renderChart, 150); });
+
+// ---------- detail ----------
+async function loadDetail() {
+  const k = S.focus; if (!k) return;
+  const row = rowsForCoin().find((r) => r.strategy === k);
+  $("dTitle").textContent = nameOf(k);
+  $("dRule").innerHTML = esc(ruleOf(k)) + (row ? ` · ${int(row.settled)} settled trades in this view · ${verdictHtml(row.v)}` : " · no signals in this view");
+  const days = S.days || null, coin = S.coin || null;
+  let q = (k === "main" ? sb.from("signals").select("coin,ticker,decided_at,side,price,result").eq("passed", true)
+    : sb.from("strat_signals").select("coin,ticker,decided_at,side,price,result").eq("passed", true).eq("strategy", k))
+    .order("decided_at", { ascending: false }).limit(40);
+  if (coin) q = q.eq("coin", coin);
+  if (days) q = q.gte("decided_at", new Date(Date.now() - days * 864e5).toISOString());
+  const [bd, rec] = await Promise.all([rpcAll("strategy_breakdown", { p_strategy: k, p_days: days, p_coin: coin }), q]);
+  if (S.focus !== k) return;
+  const part = (kind, title, label) => {
+    const rows = bd.filter((r) => r.kind === kind).sort((a, b) => +a.sort_key - +b.sort_key);
+    if (!rows.length) return "";
+    const mx = Math.max(...rows.map((r) => Math.abs(+r.avg_c))) || 1;
+    return `<div><h3>${title}</h3><div class="scroll" style="max-height:320px;overflow-y:auto"><table>
+      <tr><th class="l">${label}</th><th>Trades</th><th>Won</th><th>Avg / contract</th></tr>
+      ${rows.map((r) => { const a = +r.avg_c, w = Math.min(50, Math.abs(a) / mx * 50);
+        return `<tr><td class="l">${esc(r.bucket)}</td><td class="num">${int(r.n)}</td><td class="num">${(r.wins / r.n * 100).toFixed(0)}%</td>
+          <td class="num ${cls(a)}">${cents(a)}<span class="bar" aria-hidden="true"><span class="z"></span><span class="f" style="${a >= 0 ? `left:50%;width:${w}%;background:var(--div-pos)` : `right:50%;width:${w}%;background:var(--div-neg)`}"></span></span></td></tr>`; }).join("")}
+    </table></div></div>`;
+  };
+  const recent = (rec.data || []).map((x) => {
+    const c = x.result ? ((x.result === x.side ? 1 - x.price : -x.price) - 0.07 * x.price * (1 - x.price)) * 100 : null;
+    return `<tr><td class="l">${tm(x.decided_at)}</td><td class="l">${esc(x.coin)}</td><td>${x.side === "yes" ? "Yes" : "No"}</td><td class="num">${(x.price * 100).toFixed(0)}¢</td>
+      <td>${x.result ? (x.result === x.side ? '<span class="pos">✓ Won</span>' : '<span class="neg">✗ Lost</span>') : '<span class="muted">waiting</span>'}</td><td class="num ${cls(c)}">${cents(c)}</td></tr>`;
+  }).join("");
+  $("dBody").innerHTML = `<div class="grid2">${part("week", "By week (is it fading?)", "Week of")}${part("price", "By price paid", "Price")}${part("coin", "By market", "Market")}${part("hour", "By hour of day (Pacific)", "Hour")}</div>
+    <h3 style="margin-top:16px">Latest signals</h3><div class="scroll" style="max-height:360px;overflow-y:auto"><table>
+    <tr><th class="l">Time</th><th class="l">Market</th><th>Bought</th><th>Price</th><th>Result</th><th>Profit</th></tr>${recent || '<tr><td class="l muted" colspan="6">None in this view.</td></tr>'}</table></div>`;
+}
+
+// ---------- filters ----------
+function paintFilters() {
+  for (const b of $("fPeriod").children) b.classList.toggle("on", (b.dataset.v || "") === String(S.days || ""));
+  for (const b of $("fCoin").children) b.classList.toggle("on", b.dataset.v === S.coin);
+}
+$("fPeriod").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; S.days = b.dataset.v ? +b.dataset.v : 0; paintFilters(); load(); });
+$("fCoin").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; S.coin = b.dataset.v; paintFilters(); load(); });
+
+// ---------- auth ----------
+let timer = null;
+function show(session) {
+  $("signedOut").classList.toggle("hidden", !!session); $("app").classList.toggle("hidden", !session);
+  $("whoEmail").textContent = session ? session.user.email : "";
+  clearInterval(timer);
+  if (session) { paintFilters(); load(); timer = setInterval(load, 60000); }
+}
+sb.auth.onAuthStateChange((_e, s) => show(s));             // fires once at start with the saved session (or none)
+</script>
+</body>
+</html>
